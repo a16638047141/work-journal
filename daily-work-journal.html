@@ -647,20 +647,6 @@
             <label for="journalDate">日期</label>
             <input id="journalDate" type="date">
           </div>
-          <div class="field-grid" style="margin-bottom:10px">
-            <div class="field">
-              <label for="checkIn">上班打卡</label>
-              <input id="checkIn" type="time" step="60">
-            </div>
-            <div class="field">
-              <label for="checkOut">下班打卡</label>
-              <input id="checkOut" type="time" step="60">
-            </div>
-            <div class="field">
-              <label>&nbsp;</label>
-              <label style="margin-top:4px"><input type="checkbox" id="isOffsite" style="width:auto;min-height:auto;margin-right:4px">外勤</label>
-            </div>
-          </div>
           <div class="week-strip" id="weekStrip" aria-label="自然周"></div>
           <textarea id="journalText" class="journal-text" spellcheck="true" placeholder="今天做了什么"></textarea>
         </div>
@@ -926,9 +912,6 @@
           "journalText",
           "journalMeta",
           "clearJournal",
-          "checkIn",
-          "checkOut",
-          "isOffsite",
           "saveNow",
           "expenseRange",
           "expenseForm",
@@ -972,7 +955,6 @@
         state.reportDate = state.selectedDate;
         state.expenseView = state.expenseView || "week";
         state.journals = state.journals || {};
-      state.attendance = state.attendance || {};
         sanitizeJournals();
         state.expenses = Array.isArray(state.expenses) ? state.expenses : [];
         if (!state.template || isLegacyDefaultTemplate(state.template) || isOutdatedExcelTemplate(state.template)) {
@@ -984,7 +966,6 @@
 
         els.journalDate.value = state.selectedDate;
         els.journalText.value = state.journals[state.selectedDate] || "";
-        syncAttendanceFromState();
         els.expenseDate.value = state.reportDate;
         els.reportDate.value = state.reportDate;
         els.reportFileName.value = state.reportFileName;
@@ -1001,7 +982,6 @@
           els.journalDate.value = state.selectedDate;
           syncWeekContext(state.selectedDate);
           els.journalText.value = state.journals[state.selectedDate] || "";
-          syncAttendanceFromState();
           renderJournal();
           renderExpenses();
           renderReportRange();
@@ -1014,9 +994,6 @@
           queuePersist();
         });
 
-        els.checkIn.addEventListener("change", () => { saveCurrentJournal(); queuePersist(); });
-        els.checkOut.addEventListener("change", () => { saveCurrentJournal(); queuePersist(); });
-        els.isOffsite.addEventListener("change", () => { saveCurrentJournal(); queuePersist(); });
 
         els.saveNow.addEventListener("click", () => {
           saveCurrentJournal();
@@ -1226,7 +1203,6 @@
             els.journalDate.value = state.selectedDate;
             syncWeekContext(state.selectedDate);
             els.journalText.value = state.journals[state.selectedDate] || "";
-            syncAttendanceFromState();
             renderJournal();
             renderExpenses();
             renderReportRange();
@@ -1355,15 +1331,11 @@
       function buildWorkContentHtml(startKey) {
         return getWorkdays(startKey).map((dateKey) => {
           const content = (state.journals[dateKey] || "").trim();
-          const att = state.attendance[dateKey] || {};
-          const attInfo = [att.checkIn ? `上班: ${att.checkIn}` : "", att.checkOut ? `下班: ${att.checkOut}` : "", att.isOffsite ? " [外勤]" : ""].filter(Boolean).join(" | ");
-          const header = attInfo ? `<div class="attendance-line">${escapeHtml(attInfo)}</div>` : "";
           const body = content
             ? `<div class="work-entry">${escapeHtml(content).replace(/\n/g, "<br>")}</div>`
             : `<div class="work-entry muted">暂无记录</div>`;
           return `<section class="work-day">
             <h3>${escapeHtml(getWeekdayName(parseDateKey(dateKey)))} ${escapeHtml(formatDateCn(dateKey))}</h3>
-            ${header}
             ${body}
           </section>`;
         }).join("\n");
@@ -2198,23 +2170,10 @@ ${content}
         });
       }
 
-      function syncAttendanceFromState() {
-        const dateKey = state.selectedDate;
-        const att = state.attendance[dateKey] || {};
-        els.checkIn.value = att.checkIn || "";
-        els.checkOut.value = att.checkOut || "";
-        els.isOffsite.checked = !!att.isOffsite;
-      }
-
       function saveCurrentJournal() {
         const dateKey = normalizeDateKey(els.journalDate.value) || toDateKey(new Date());
         state.selectedDate = dateKey;
         setJournalEntry(dateKey, els.journalText.value);
-        state.attendance[dateKey] = {
-          checkIn: els.checkIn.value || "",
-          checkOut: els.checkOut.value || "",
-          isOffsite: !!els.isOffsite.checked
-        };
       }
 
       function syncWeekContext(dateKey) {
@@ -2435,7 +2394,6 @@ ${content}
               imported.expenseView = imported.expenseView || "week";
               imported.generatedReport = imported.generatedReport || "";
               imported.template = imported.template || state.template;
-              imported.attendance = imported.attendance || {};
               imported.reportFileName = imported.reportFileName || "周报.xlsx";
               Object.assign(state, imported);
               saveToStorage();
