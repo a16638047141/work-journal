@@ -902,13 +902,13 @@
         bindEvents();
         renderAll();
         updateCloudUI();
-        if (getCloudUrl()) {
-          cloudLoad(getCloudUrl());
+        if (getGistId() && getGistToken()) {
+          cloudLoad(getGistId());
         }
         setInterval(() => {
           saveCurrentJournal();
           persist("自动保存");
-          if (getCloudUrl()) cloudSync();
+          if (getGistId() && getGistToken()) cloudSync();
         }, 30000);
       }
 
@@ -2282,6 +2282,10 @@ ${content}
 
       function getCloudUrl() { return localStorage.getItem(CLOUD_KEY); }
       function setCloudUrl(url) { localStorage.setItem(CLOUD_KEY, url); }
+      function getGistId() { return localStorage.getItem("gist-id"); }
+      function setGistId(id) { localStorage.setItem("gist-id", id); }
+      function getGistToken() { return localStorage.getItem("gist-token"); }
+      function setGistToken(t) { localStorage.setItem("gist-token", t); }
       function updateCloudUI() {
         const url = getCloudUrl();
         if (url) {
@@ -2292,6 +2296,7 @@ ${content}
           els.cloudStatus.style.color = "#4fd1bd";
         } else {
           els.cloudEnable.style.display = "inline-block";
+          els.cloudEnable.textContent = "启用";
           els.cloudSync.style.display = "none";
           els.cloudCopy.style.display = "none";
           els.cloudStatus.textContent = "未连接";
@@ -2301,31 +2306,46 @@ ${content}
 
       async function cloudEnable() {
         saveCurrentJournal();
+        let token = getGistToken();
+        if (!token) {
+          token = prompt("首次启用需要 GitHub Token（仅 gist 权限）：\n\n去 https://github.com/settings/tokens 生成\n→ Generate new token (classic)\n→ 勾选 gist\n→ 复制 token 粘贴到这里");
+          if (!token) return;
+          setGistToken(token);
+        }
         try {
-          const resp = await fetch("https://api.npoint.io", {
+          const resp = await fetch("https://api.github.com/gists", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(state)
+            headers: { "Authorization": "token " + token, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              description: "work-journal-sync",
+              public: false,
+              files: { "work-journal.json": { content: JSON.stringify(state) } }
+            })
           });
           const data = await resp.json();
-          const id = data.id || data.url;
-          setCloudUrl(id);
-          updateCloudUI();
-          toast("云端已启用！同步码: " + id.substring(0, 16) + "... 发到另一台设备粘贴");
+          if (data.id) {
+            setGistId(data.id);
+            updateCloudUI();
+            toast("云端已启用！复制此 Gist ID 到另一台设备: " + data.id);
+          } else {
+            toast("Token 无效，请重新生成");
+            setGistToken("");
+          }
         } catch (e) {
-          toast("连接失败，重试一次");
+          toast("连接失败: " + e.message);
         }
       }
 
       async function cloudSync() {
-        const url = getCloudUrl();
-        if (!url) return;
+        const gistId = getGistId();
+        const token = getGistToken();
+        if (!gistId || !token) return;
         saveCurrentJournal();
         try {
-          await fetch("https://api.npoint.io/" + url, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(state)
+          await fetch("https://api.github.com/gists/" + gistId, {
+            method: "PATCH",
+            headers: { "Authorization": "token " + token, "Content-Type": "application/json" },
+            body: JSON.stringify({ files: { "work-journal.json": { content: JSON.stringify(state) } } })
           });
           toast("已同步");
         } catch (e) {
@@ -2333,28 +2353,42 @@ ${content}
         }
       }
 
-      async function cloudLoad(url) {
+      async function cloudLoad(gistId) {
+        const token = getGistToken();
+        if (!token) {
+          const t = prompt("输入 GitHub Token（仅 gist 权限）：");
+          if (!t) return;
+          setGistToken(t);
+        }
         try {
-          const resp = await fetch("https://api.npoint.io/" + url);
+          const resp = await fetch("https://api.github.com/gists/" + gistId, {
+            headers: { "Authorization": "token " + (getGistToken()) }
+          });
           const data = await resp.json();
-          setCloudUrl(url);
-          Object.assign(state, data);
+          const content = JSON.parse(data.files["work-journal.json"].content);
+          setGistId(gistId);
+          Object.assign(state, content);
           saveToStorage();
           hydrateControls();
           renderAll();
           updateCloudUI();
           toast("云端数据已加载");
         } catch (e) {
-          toast("加载失败，检查同步码");
+          toast("加载失败");
         }
       }
 
       function cloudCopyUrl() {
-        const url = getCloudUrl();
-        if (url) {
-          navigator.clipboard.writeText(url).then(() => toast("同步码已复制，发送到另一台设备"))
-            .catch(() => toast("复制失败: " + url));
+        const gistId = getGistId();
+        if (gistId) {
+          navigator.clipboard.writeText(gistId).then(() => toast("Gist ID 已复制，发送到另一台设备"))
+            .catch(() => toast("Gist ID: " + gistId));
         }
+      }
+
+      function cloudConnect() {
+        const gistId = prompt("输入另一台设备上的 Gist ID：");
+        if (gistId) cloudLoad(gistId);
       }
 
       function exportAllData() {
