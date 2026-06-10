@@ -902,9 +902,9 @@
         hydrateControls();
         bindEvents();
         renderAll();
-        updateCloudUI();
+        try { updateCloudUI(); } catch(e) {}
         if (getGistId() && getGistToken()) {
-          cloudLoad(getGistId());
+          try { cloudLoad(getGistId()); } catch(e) {}
         }
         setInterval(() => {
           saveCurrentJournal();
