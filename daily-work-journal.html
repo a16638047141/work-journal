@@ -2319,7 +2319,7 @@ ${content}
         try {
           const resp = await fetch("https://api.github.com/gists", {
             method: "POST",
-            headers: { "Authorization": "token " + token, "Content-Type": "application/json" },
+            headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
             body: JSON.stringify({
               description: "work-journal-sync",
               public: false,
@@ -2348,7 +2348,7 @@ ${content}
         try {
           await fetch("https://api.github.com/gists/" + gistId, {
             method: "PATCH",
-            headers: { "Authorization": "token " + token, "Content-Type": "application/json" },
+            headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
             body: JSON.stringify({ files: { "work-journal.json": { content: JSON.stringify(state) } } })
           });
           toast("已同步");
@@ -2358,18 +2358,26 @@ ${content}
       }
 
       async function cloudLoad(gistId) {
-        const token = getGistToken();
+        let token = getGistToken();
         if (!token) {
-          const t = prompt("输入 GitHub Token（仅 gist 权限）：");
-          if (!t) return;
-          setGistToken(t);
+          token = prompt("输入 GitHub Token（仅 gist 权限）：");
+          if (!token) return;
+          setGistToken(token);
         }
         try {
           const resp = await fetch("https://api.github.com/gists/" + gistId, {
-            headers: { "Authorization": "token " + (getGistToken()) }
+            headers: { "Authorization": "Bearer " + getGistToken(), "Accept": "application/vnd.github+json" }
           });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            toast("错误: " + (err.message || "HTTP " + resp.status));
+            if (resp.status === 401 || resp.status === 403) { setGistToken(""); toast("Token 无效或权限不足，请重新连接"); }
+            return;
+          }
           const data = await resp.json();
-          const content = JSON.parse(data.files["work-journal.json"].content);
+          const file = data.files && data.files["work-journal.json"];
+          if (!file) { toast("Gist 中没有找到数据文件"); return; }
+          const content = JSON.parse(file.content);
           setGistId(gistId);
           Object.assign(state, content);
           saveToStorage();
@@ -2378,7 +2386,7 @@ ${content}
           updateCloudUI();
           toast("云端数据已加载");
         } catch (e) {
-          toast("加载失败");
+          toast("加载失败: " + e.message);
         }
       }
 
