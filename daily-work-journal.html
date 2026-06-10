@@ -284,6 +284,11 @@
       grid-template-columns: 1fr 0.95fr 0.75fr;
     }
 
+    .field-grid.report-controls {
+      grid-template-columns: minmax(110px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr) auto;
+      align-items: end;
+    }
+
     .field {
       min-width: 0;
     }
@@ -377,10 +382,6 @@
       margin-bottom: 12px;
     }
 
-    .expense-form .note-field {
-      grid-column: 1 / -1;
-    }
-
     .expense-form .submit-row {
       grid-column: 1 / -1;
       display: flex;
@@ -427,6 +428,61 @@
       border-radius: var(--radius);
       background: #121416;
       max-height: 420px;
+    }
+
+    details.trip-import-panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      margin: 12px 0;
+      background: rgba(255, 255, 255, 0.018);
+    }
+
+    details.trip-import-panel summary {
+      cursor: pointer;
+      color: var(--muted-strong);
+      font-weight: 700;
+      padding: 10px 12px;
+    }
+
+    .trip-import-body {
+      border-top: 1px solid var(--line);
+      padding: 12px;
+    }
+
+    .trip-import-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .trip-import-text {
+      min-height: 130px;
+      font-family: Consolas, "SFMono-Regular", "Microsoft YaHei", monospace;
+      font-size: 12px;
+    }
+
+    .trip-import-result {
+      margin-top: 10px;
+    }
+
+    .trip-import-result input[type="date"],
+    .trip-import-result input[type="number"],
+    .trip-import-result input[type="text"] {
+      min-height: 32px;
+      padding: 5px 7px;
+      font-size: 12px;
+    }
+
+    .trip-import-result input[type="checkbox"] {
+      width: 16px;
+      min-height: 16px;
+      padding: 0;
+      accent-color: var(--accent);
+    }
+
+    .trip-import-result .table-wrap {
+      max-height: 300px;
     }
 
     .empty {
@@ -554,7 +610,8 @@
       .workspace,
       .report-grid,
       .field-grid,
-      .field-grid.three {
+      .field-grid.three,
+      .field-grid.report-controls {
         grid-template-columns: 1fr;
       }
 
@@ -683,16 +740,30 @@
               <label for="expenseAmount">金额</label>
               <input id="expenseAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
             </div>
-            <div class="field note-field">
-              <label for="expenseNote">备注</label>
-              <input id="expenseNote" type="text" maxlength="120" placeholder="项目、地点或说明">
-            </div>
+            <input id="expenseNote" type="hidden" value="">
             <div class="submit-row">
               <button type="submit" class="primary" title="添加费用">添加</button>
             </div>
           </form>
 
           <div class="week-strip expense-week-strip" id="expenseWeekStrip" aria-label="费用周日期"></div>
+
+          <details class="trip-import-panel">
+            <summary>月度行程导入</summary>
+            <div class="trip-import-body">
+              <div class="trip-import-actions">
+                <input id="tripImportFile" type="file" accept=".txt,.csv,.tsv,.pdf,application/pdf,text/plain,text/csv" hidden>
+                <button type="button" id="tripImportChoose">上传行程单</button>
+                <button type="button" id="tripImportParse" class="primary">解析行程</button>
+                <button type="button" id="tripImportApply">确认导入费用</button>
+                <button type="button" id="tripImportClear" class="ghost">清空</button>
+              </div>
+              <textarea id="tripImportText" class="trip-import-text" spellcheck="false" placeholder="月底处理时，把滴滴行程单明细复制到这里，或上传滴滴 PDF / CSV / TXT。示例：2026-06-10 36.50 客户现场交通"></textarea>
+              <div id="tripImportResult" class="trip-import-result">
+                <div class="empty">解析后会在这里确认日期和金额</div>
+              </div>
+            </div>
+          </details>
 
           <div class="actions between">
             <div class="segment" role="tablist" aria-label="费用范围">
@@ -714,7 +785,11 @@
           <small id="reportRange">本周</small>
         </div>
         <div class="panel-body">
-          <div class="field-grid three">
+          <div class="field-grid report-controls">
+            <div class="field">
+              <label for="userName">姓名</label>
+              <input id="userName" type="text" value="袁宏林" maxlength="20">
+            </div>
             <div class="field">
               <label for="reportDate">周报日期</label>
               <input id="reportDate" type="date">
@@ -733,6 +808,7 @@
             <summary>高级：导出模板</summary>
             <div class="template-tools" aria-label="占位符">
               <button type="button" class="token-button" data-token="{{DATE_RANGE}}">{{DATE_RANGE}}</button>
+              <button type="button" class="token-button" data-token="{{USER_NAME}}">{{USER_NAME}}</button>
               <button type="button" class="token-button" data-token="{{WORK_CONTENT}}">{{WORK_CONTENT}}</button>
               <button type="button" class="token-button" data-token="{{EXPENSE_TABLE}}">{{EXPENSE_TABLE}}</button>
               <button type="button" class="token-button" data-token="{{TOTAL_EXPENSE}}">{{TOTAL_EXPENSE}}</button>
@@ -807,7 +883,7 @@
         <td colspan="16" class="xls-top-cell">&nbsp;</td>
       </tr>
       <tr class="xls-identity-row">
-        <td colspan="16" class="xls-identity-cell">姓名：袁宏林&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;职位：&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;监督人：</td>
+        <td colspan="16" class="xls-identity-cell">姓名：{{USER_NAME}}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;职位：&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;监督人：</td>
       </tr>
       <tr class="xls-title-row">
         <td colspan="4" class="xls-section-title">本 周 工 作 记 录</td>
@@ -880,15 +956,18 @@
       const els = {};
       let persistTimer = 0;
       let toastTimer = 0;
+      let pendingTripRows = [];
+      let pdfJsLoadPromise = null;
+      const PDFJS_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
+      const PDFJS_WORKER_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
       document.addEventListener("DOMContentLoaded", init);
 
       function init() {
         bindElements();
         hydrateControls();
-        bindEvents();
         renderAll();
-        renderWeekStrip();
+        bindEvents();
         try { updateCloudUI(); } catch(e) {}
         if (getGistId() && getGistToken()) {
           try { cloudLoad(getGistId()); } catch(e) {}
@@ -921,10 +1000,18 @@
           "expenseType",
           "expenseAmount",
           "expenseNote",
+          "tripImportFile",
+          "tripImportChoose",
+          "tripImportParse",
+          "tripImportApply",
+          "tripImportClear",
+          "tripImportText",
+          "tripImportResult",
           "clearExpenses",
           "expenseSummary",
           "expenseTableWrap",
           "reportRange",
+          "userName",
           "reportDate",
           "reportFileName",
           "generateReport",
@@ -964,10 +1051,13 @@
         state.templateVersion = TEMPLATE_VERSION;
         state.generatedReport = state.generatedReport || "";
         state.reportFileName = normalizeReportFileName(state.reportFileName || "周报.xlsx");
+        state.userName = normalizeUserName(state.userName);
+        state.template = migrateUserNameTemplate(state.template);
 
         els.journalDate.value = state.selectedDate;
         els.journalText.value = state.journals[state.selectedDate] || "";
         els.expenseDate.value = state.reportDate;
+        els.userName.value = state.userName;
         els.reportDate.value = state.reportDate;
         els.reportFileName.value = state.reportFileName;
         els.templateText.value = state.template;
@@ -1016,6 +1106,12 @@
           event.preventDefault();
           addExpense();
         });
+
+        els.tripImportChoose.addEventListener("click", () => els.tripImportFile.click());
+        els.tripImportFile.addEventListener("change", loadTripImportFile);
+        els.tripImportParse.addEventListener("click", parseTripImportText);
+        els.tripImportApply.addEventListener("click", applyTripImportRows);
+        els.tripImportClear.addEventListener("click", clearTripImport);
 
         els.expenseDate.addEventListener("change", () => {
           const dateKey = normalizeDateKey(els.expenseDate.value) || toDateKey(new Date());
@@ -1079,6 +1175,11 @@
           queuePersist();
         });
 
+        els.userName.addEventListener("input", () => {
+          state.userName = normalizeUserName(els.userName.value);
+          queuePersist();
+        });
+
         els.templateText.addEventListener("input", () => {
           state.template = els.templateText.value;
           queuePersist();
@@ -1106,18 +1207,24 @@
         els.downloadReport.addEventListener("click", downloadReport);
         els.printReport.addEventListener("click", printReport);
 
-        els.cloudNew.addEventListener("click", cloudEnable);
-        els.cloudConnect.addEventListener("click", cloudConnect);
-        els.cloudSync.addEventListener("click", cloudSync);
-        els.cloudCopy.addEventListener("click", cloudCopyUrl);
-        els.exportData.addEventListener("click", exportAllData);
-        els.importData.addEventListener("click", () => els.importFile.click());
-        els.importFile.addEventListener("change", importAllData);
+        onOptional("cloudNew", "click", cloudEnable);
+        onOptional("cloudConnect", "click", cloudConnect);
+        onOptional("cloudSync", "click", cloudSync);
+        onOptional("cloudCopy", "click", cloudCopyUrl);
+        onOptional("exportData", "click", exportAllData);
+        onOptional("importData", "click", () => els.importFile && els.importFile.click());
+        onOptional("importFile", "change", importAllData);
 
         window.addEventListener("beforeunload", () => {
           saveCurrentJournal();
           saveToStorage();
         });
+      }
+
+      function onOptional(id, eventName, handler) {
+        if (els[id]) {
+          els[id].addEventListener(eventName, handler);
+        }
       }
 
       function addExpense() {
@@ -1137,7 +1244,7 @@
           date,
           type: els.expenseType.value,
           amount: roundMoney(amount),
-          note: els.expenseNote.value.trim()
+          note: ""
         });
 
         state.reportDate = date;
@@ -1148,6 +1255,318 @@
         renderAll();
         persist("已保存");
         toast("费用已添加");
+      }
+
+      async function loadTripImportFile() {
+        const file = els.tripImportFile.files[0];
+        if (!file) return;
+        const name = file.name || "";
+        const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(name);
+        const isText = /(\.txt|\.csv|\.tsv)$/i.test(name) || /^(text\/|application\/vnd\.ms-excel)/i.test(file.type || "");
+        try {
+          if (isPdf) {
+            toast("正在读取 PDF 行程单...");
+            const text = normalizeTripImportText(await extractPdfTextFromFile(file));
+            if (!text) {
+              pendingTripRows = [];
+              els.tripImportText.value = "";
+              renderTripImportRows();
+              toast("PDF 里没有识别到文字，请改用 CSV/TXT 或复制行程明细");
+              return;
+            }
+            els.tripImportText.value = text;
+            parseTripImportText();
+            return;
+          }
+          if (!isText) {
+            toast("当前支持滴滴 PDF、CSV、TXT；图片需要 OCR，暂不支持");
+            return;
+          }
+          els.tripImportText.value = normalizeTripImportText(await file.text());
+          parseTripImportText();
+        } catch (error) {
+          console.error(error);
+          if (isPdf) {
+            els.tripImportText.value = "";
+          }
+          const fallback = isPdf ? "，也可以先把 PDF 内容复制到文本框" : "";
+          toast(`文件读取失败${fallback}`);
+        } finally {
+          els.tripImportFile.value = "";
+        }
+      }
+
+      async function extractPdfTextFromFile(file) {
+        const pdfjsLib = await loadPdfJs();
+        let pdf = null;
+        try {
+          const data = new Uint8Array(await file.arrayBuffer());
+          const loadingTask = pdfjsLib.getDocument({
+            data,
+            disableWorker: true,
+            isEvalSupported: false
+          });
+          pdf = await loadingTask.promise;
+          const lines = [];
+          for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+            const page = await pdf.getPage(pageNumber);
+            const content = await page.getTextContent({ normalizeWhitespace: true });
+            lines.push(...pdfTextItemsToLines(content.items || []));
+          }
+          return lines.join("\n");
+        } finally {
+          if (pdf && typeof pdf.destroy === "function") {
+            await pdf.destroy();
+          }
+        }
+      }
+
+      function loadPdfJs() {
+        if (window.pdfjsLib && typeof window.pdfjsLib.getDocument === "function") {
+          configurePdfJs(window.pdfjsLib);
+          return Promise.resolve(window.pdfjsLib);
+        }
+        if (!pdfJsLoadPromise) {
+          pdfJsLoadPromise = new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = PDFJS_URL;
+            script.async = true;
+            script.crossOrigin = "anonymous";
+            script.onload = () => {
+              if (!window.pdfjsLib || typeof window.pdfjsLib.getDocument !== "function") {
+                pdfJsLoadPromise = null;
+                reject(new Error("PDF.js did not load"));
+                return;
+              }
+              configurePdfJs(window.pdfjsLib);
+              resolve(window.pdfjsLib);
+            };
+            script.onerror = () => {
+              pdfJsLoadPromise = null;
+              reject(new Error("PDF.js load failed"));
+            };
+            document.head.appendChild(script);
+          });
+        }
+        return pdfJsLoadPromise;
+      }
+
+      function configurePdfJs(pdfjsLib) {
+        if (pdfjsLib.GlobalWorkerOptions) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+        }
+      }
+
+      function pdfTextItemsToLines(items) {
+        const tokens = items
+          .map((item) => {
+            const text = String(item.str || "").replace(/\s+/g, " ").trim();
+            const transform = item.transform || [1, 0, 0, 1, 0, 0];
+            return {
+              text,
+              x: Number(transform[4]) || 0,
+              y: Number(transform[5]) || 0,
+              height: Math.abs(Number(item.height) || Number(transform[3]) || 10)
+            };
+          })
+          .filter((item) => item.text);
+        tokens.sort((a, b) => Math.abs(b.y - a.y) > 3 ? b.y - a.y : a.x - b.x);
+        const rows = [];
+        tokens.forEach((token) => {
+          const row = rows.find((candidate) => Math.abs(candidate.y - token.y) <= Math.max(2, token.height * 0.35));
+          if (row) {
+            row.items.push(token);
+            row.y = (row.y + token.y) / 2;
+          } else {
+            rows.push({ y: token.y, items: [token] });
+          }
+        });
+        return rows
+          .sort((a, b) => b.y - a.y)
+          .map((row) => row.items
+            .sort((a, b) => a.x - b.x)
+            .map((item) => item.text)
+            .join(" ")
+            .replace(/\s+/g, " ")
+            .trim())
+          .filter(Boolean);
+      }
+
+      function normalizeTripImportText(text) {
+        return String(text || "")
+          .replace(/\u00a0/g, " ")
+          .replace(/[ \t]+\n/g, "\n")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+      }
+
+      function parseTripImportText() {
+        const text = els.tripImportText.value.trim();
+        if (!text) {
+          pendingTripRows = [];
+          renderTripImportRows();
+          toast("请先粘贴或上传行程明细");
+          return;
+        }
+        pendingTripRows = parseTripRows(text);
+        renderTripImportRows();
+        toast(pendingTripRows.length ? `识别到 ${pendingTripRows.length} 条行程` : "没有识别到行程，请检查文本格式");
+      }
+
+      function parseTripRows(text) {
+        const importYear = inferTripImportYear(text);
+        return text
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line, index) => parseTripLine(line, index + 1, importYear))
+          .filter(Boolean);
+      }
+
+      function parseTripLine(line, lineNumber, importYear) {
+        if (/^(滴滴出行|DIDI|页码)|行程起止日期|申请日期|手机号|共\d+笔|合计|序号|金额\[|TRIP TABLE/i.test(line)) {
+          return null;
+        }
+        const dateKey = extractTripDate(line, importYear);
+        const amount = extractTripAmount(line);
+        if (!dateKey || !Number.isFinite(amount) || amount <= 0) {
+          return null;
+        }
+        return {
+          selected: true,
+          date: dateKey,
+          type: "打车",
+          amount: roundMoney(amount),
+          note: "",
+          sourceLine: line,
+          lineNumber
+        };
+      }
+
+      function inferTripImportYear(text) {
+        const fullDate = String(text || "").match(/((?:19|20)\d{2})\s*[年\/.-]\s*\d{1,2}\s*[月\/.-]\s*\d{1,2}/);
+        return fullDate ? Number(fullDate[1]) : parseDateKey(state.reportDate).getFullYear();
+      }
+
+      function extractTripDate(line, importYear) {
+        const reportYear = Number(importYear) || parseDateKey(state.reportDate).getFullYear();
+        const fullDate = line.match(/(\d{4})\s*[年\/.-]\s*(\d{1,2})\s*[月\/.-]\s*(\d{1,2})\s*日?/);
+        if (fullDate) {
+          return normalizeDateParts(fullDate[1], fullDate[2], fullDate[3]);
+        }
+        const cnDate = line.match(/(\d{1,2})月\s*(\d{1,2})日/);
+        if (cnDate) {
+          return normalizeDateParts(reportYear, cnDate[1], cnDate[2]);
+        }
+        const shortDate = line.match(/(?:^|[,\s\t，])(\d{1,2})\s*[\/-]\s*(\d{1,2})(?=[,\s\t，]|$)/);
+        if (shortDate) {
+          return normalizeDateParts(reportYear, shortDate[1], shortDate[2]);
+        }
+        return "";
+      }
+
+      function extractTripAmount(line) {
+        const currency = line.match(/[￥¥]\s*(\d+(?:\.\d{1,2})?)/);
+        if (currency) {
+          return Number.parseFloat(currency[1]);
+        }
+        const withoutDate = line
+          .replace(/\d{4}\s*[年\/.-]\s*\d{1,2}\s*[月\/.-]\s*\d{1,2}\s*日?/g, " ")
+          .replace(/\d{1,2}月\s*\d{1,2}日/g, " ")
+          .replace(/\b\d{1,2}\s*[\/-]\s*\d{1,2}\b/g, " ")
+          .replace(/\b\d{1,2}\s*[:：]\s*\d{2}(?:\s*[:：]\s*\d{2})?\b/g, " ");
+        const decimals = [...withoutDate.matchAll(/\b\d{1,5}\.\d{1,2}\b/g)].map((match) => Number.parseFloat(match[0]));
+        if (decimals.length) {
+          return decimals[decimals.length - 1];
+        }
+        const moneyAfterLabel = withoutDate.match(/(?:金额|费用|实付|合计|支付)[^\d]*(\d{1,5})\b/);
+        if (moneyAfterLabel) {
+          return Number.parseFloat(moneyAfterLabel[1]);
+        }
+        const csvParts = line.split(/[,\t，]/).map((part) => part.trim());
+        const numericParts = csvParts
+          .filter((part) => /^\d{1,5}$/.test(part))
+          .map(Number);
+        return numericParts.length ? numericParts[numericParts.length - 1] : NaN;
+      }
+
+      function normalizeDateParts(year, month, day) {
+        const date = new Date(Number(year), Number(month) - 1, Number(day));
+        if (date.getFullYear() !== Number(year) || date.getMonth() !== Number(month) - 1 || date.getDate() !== Number(day)) {
+          return "";
+        }
+        return toDateKey(date);
+      }
+
+      function renderTripImportRows() {
+        if (!pendingTripRows.length) {
+          els.tripImportResult.innerHTML = `<div class="empty">暂无待确认行程</div>`;
+          return;
+        }
+        const rows = pendingTripRows.map((row, index) => `<tr data-trip-index="${index}">
+          <td><input type="checkbox" data-trip-field="selected" ${row.selected ? "checked" : ""} title="导入这条"></td>
+          <td><input type="date" data-trip-field="date" value="${escapeHtml(row.date)}"></td>
+          <td><input type="number" min="0.01" step="0.01" data-trip-field="amount" value="${escapeHtml(formatGeneralMoney(row.amount))}"></td>
+        </tr>`).join("");
+        els.tripImportResult.innerHTML = `<div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>导入</th>
+                <th>日期</th>
+                <th class="amount">金额</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+      }
+
+      function readTripImportRowsFromDom() {
+        return Array.from(els.tripImportResult.querySelectorAll("[data-trip-index]"))
+          .map((tr) => {
+            const get = (field) => tr.querySelector(`[data-trip-field="${field}"]`);
+            return {
+              selected: Boolean(get("selected") && get("selected").checked),
+              date: normalizeDateKey(get("date") ? get("date").value : ""),
+              amount: roundMoney(Number.parseFloat(get("amount") ? get("amount").value : ""))
+            };
+          });
+      }
+
+      function applyTripImportRows() {
+        const rows = readTripImportRowsFromDom()
+          .filter((row) => row.selected && row.date && Number.isFinite(row.amount) && row.amount > 0);
+        if (!rows.length) {
+          toast("没有可导入的有效行程");
+          return;
+        }
+        rows.forEach((row) => {
+          state.expenses.push({
+            id: createId(),
+            date: row.date,
+            type: "打车",
+            amount: row.amount,
+            note: ""
+          });
+        });
+        state.expenses.sort((a, b) => a.date.localeCompare(b.date) || a.type.localeCompare(b.type));
+        state.reportDate = rows[0].date;
+        els.reportDate.value = state.reportDate;
+        els.expenseDate.value = state.reportDate;
+        state.expenseView = "month";
+        updateExpenseViewButtons();
+        pendingTripRows = [];
+        renderTripImportRows();
+        renderAll();
+        persist("已保存");
+        toast(`已导入 ${rows.length} 条打车费用`);
+      }
+
+      function clearTripImport() {
+        pendingTripRows = [];
+        els.tripImportText.value = "";
+        renderTripImportRows();
       }
 
       function renderAll() {
@@ -1165,11 +1584,15 @@
         const writtenDays = getWorkdays(state.reportDate).filter((dateKey) => hasJournalEntry(dateKey));
         els.weekTotal.textContent = formatMoney(sumExpenses(weekItems));
         els.monthTotal.textContent = formatMoney(sumExpenses(monthItems));
-        els.journalDays.textContent = writtenDays.length;
-        els.journalDaysPreview.textContent = writtenDays.length
-          ? writtenDays.map((dateKey) => `${getWeekdayName(parseDateKey(dateKey))} ${formatMonthDay(dateKey)}`).join("、")
-          : "暂无记录";
-        els.journalDaysPreview.title = els.journalDaysPreview.textContent;
+        if (els.journalDays) {
+          els.journalDays.textContent = writtenDays.length;
+        }
+        if (els.journalDaysPreview) {
+          els.journalDaysPreview.textContent = writtenDays.length
+            ? writtenDays.map((dateKey) => `${getWeekdayName(parseDateKey(dateKey))} ${formatMonthDay(dateKey)}`).join("、")
+            : "暂无记录";
+          els.journalDaysPreview.title = els.journalDaysPreview.textContent;
+        }
       }
 
       function renderJournal() {
@@ -1271,7 +1694,6 @@
             <td>${escapeHtml(shortDate(item.date))}</td>
             <td><span class="type-badge">${escapeHtml(item.type)}</span></td>
             <td class="amount">${formatMoney(item.amount)}</td>
-            <td>${escapeHtml(item.note || "")}</td>
             <td><button type="button" class="icon-only danger" title="删除费用" data-delete-expense="${escapeHtml(item.id)}">×</button></td>
           </tr>`)
           .join("");
@@ -1282,7 +1704,6 @@
               <th>日期</th>
               <th>类型</th>
               <th class="amount">金额</th>
-              <th>备注</th>
               <th aria-label="操作"></th>
             </tr>
           </thead>
@@ -1317,6 +1738,7 @@
         const total = sumExpenses(expenseItems);
         const replacements = {
           DATE_RANGE: `${formatDateCn(bounds.startKey)} 至 ${formatDateCn(bounds.endKey)}`,
+          USER_NAME: escapeHtml(normalizeUserName(state.userName)),
           XLS_WEEK_ROWS: buildXlsWeekRowsHtml(bounds.startKey, expenseItems),
           WORK_CONTENT: buildWorkContentHtml(bounds.startKey),
           EXPENSE_TABLE: buildExpenseTableHtml(expenseItems),
@@ -1414,7 +1836,6 @@
           <td>${escapeHtml(formatDateCn(item.date))}</td>
           <td>${escapeHtml(item.type)}</td>
           <td class="amount">${formatMoney(item.amount)}</td>
-          <td>${escapeHtml(item.note || "")}</td>
         </tr>`).join("");
 
         return `<table class="expense-report-table">
@@ -1423,7 +1844,6 @@
               <th>日期</th>
               <th>类型</th>
               <th class="amount">金额</th>
-              <th>备注</th>
             </tr>
           </thead>
           <tbody>
@@ -1431,7 +1851,6 @@
             <tr class="total-row">
               <td colspan="2">合计</td>
               <td class="amount">${formatMoney(sumExpenses(items))}</td>
-              <td></td>
             </tr>
           </tbody>
         </table>`;
@@ -1862,7 +2281,7 @@ ${content}
         styleRow(24, 6);
         styleRow(26, 6);
 
-        set(2, 1, "姓名：袁宏林                                                职位：                                                监督人：", 2);
+        set(2, 1, `姓名：${normalizeUserName(state.userName)}                                                职位：                                                监督人：`, 2);
         set(3, 1, "本 周 工 作 记 录", 3);
         set(3, 5, "本周报销款项", 3);
         set(4, 1, "具 体 时 间", 4);
@@ -2396,6 +2815,8 @@ ${content}
               imported.generatedReport = imported.generatedReport || "";
               imported.template = imported.template || state.template;
               imported.reportFileName = imported.reportFileName || "周报.xlsx";
+              imported.userName = normalizeUserName(imported.userName);
+              imported.template = migrateUserNameTemplate(imported.template);
               Object.assign(state, imported);
               saveToStorage();
               hydrateControls();
@@ -2421,7 +2842,8 @@ ${content}
           template: DEFAULT_TEMPLATE,
           templateVersion: TEMPLATE_VERSION,
           generatedReport: "",
-          reportFileName: "周报.xlsx"
+          reportFileName: "周报.xlsx",
+          userName: "袁宏林"
         };
       }
 
@@ -2435,6 +2857,17 @@ ${content}
         const normalized = String(template || "");
         return normalized.includes("weekly-xls-table")
           && normalized.includes("<span>姓名：袁宏林</span>");
+      }
+
+      function normalizeUserName(name) {
+        const value = String(name || "").trim();
+        return value || "袁宏林";
+      }
+
+      function migrateUserNameTemplate(template) {
+        return String(template || DEFAULT_TEMPLATE)
+          .replace(/姓名：袁宏林/g, "姓名：{{USER_NAME}}")
+          .replace(/<span>姓名：袁宏林<\/span>/g, "<span>姓名：{{USER_NAME}}</span>");
       }
 
       function updateSaveState(message) {
