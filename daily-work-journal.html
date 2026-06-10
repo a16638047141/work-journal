@@ -888,6 +888,7 @@
         hydrateControls();
         bindEvents();
         renderAll();
+        renderWeekStrip();
         try { updateCloudUI(); } catch(e) {}
         if (getGistId() && getGistToken()) {
           try { cloudLoad(getGistId()); } catch(e) {}
