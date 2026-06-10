@@ -2381,9 +2381,9 @@ ${content}
           setGistId(gistId);
           Object.assign(state, content);
           saveToStorage();
-          hydrateControls();
-          renderAll();
-          updateCloudUI();
+          try { hydrateControls(); } catch(e) {}
+          try { renderAll(); } catch(e) {}
+          try { updateCloudUI(); } catch(e) {}
           toast("云端数据已加载");
         } catch (e) {
           toast("加载失败: " + e.message);
