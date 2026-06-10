@@ -1,0 +1,2578 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>工作日报与周报生成器</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101112;
+      --panel: #191b1d;
+      --panel-soft: #202326;
+      --panel-strong: #25292d;
+      --line: #343a40;
+      --text: #f3f2ee;
+      --muted: #aeb4b7;
+      --muted-strong: #c8cdcf;
+      --accent: #4fd1bd;
+      --accent-strong: #79ead9;
+      --amber: #f2b84b;
+      --danger: #ff6b6b;
+      --success: #70d67b;
+      --shadow: rgba(0, 0, 0, 0.32);
+      --radius: 8px;
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-width: 320px;
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(180deg, rgba(79, 209, 189, 0.05), transparent 260px),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-strong);
+      color: var(--text);
+      min-height: 36px;
+      padding: 0 12px;
+      cursor: pointer;
+      transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+    }
+
+    button:hover,
+    button:focus-visible {
+      border-color: var(--accent);
+      outline: none;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #071311;
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+
+    button.ghost {
+      background: transparent;
+    }
+
+    button.danger {
+      color: #ffd7d7;
+      border-color: rgba(255, 107, 107, 0.5);
+      background: rgba(255, 107, 107, 0.1);
+    }
+
+    button.icon-only {
+      width: 36px;
+      min-width: 36px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+    }
+
+    label,
+    .label {
+      color: var(--muted-strong);
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #121416;
+      min-height: 38px;
+      padding: 8px 10px;
+    }
+
+    textarea {
+      resize: vertical;
+      line-height: 1.58;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(79, 209, 189, 0.12);
+    }
+
+    input[type="date"] {
+      min-width: 150px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted-strong);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    td.amount,
+    th.amount {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .app {
+      width: min(1500px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 18px 0 28px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(25, 27, 29, 0.9);
+      box-shadow: 0 18px 34px var(--shadow);
+    }
+
+    .title-block h1 {
+      font-size: clamp(22px, 3vw, 30px);
+      line-height: 1.15;
+      margin: 0 0 8px;
+      letter-spacing: 0;
+    }
+
+    .save-state {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(118px, 1fr));
+      gap: 10px;
+      min-width: min(100%, 430px);
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-soft);
+      padding: 10px 12px;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 18px;
+      line-height: 1.25;
+      color: var(--text);
+      overflow-wrap: anywhere;
+    }
+
+    .metric small {
+      display: block;
+      min-height: 16px;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(330px, 0.95fr) minmax(360px, 1.05fr) minmax(420px, 1.25fr);
+      gap: 16px;
+      align-items: start;
+      margin-top: 16px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .panel-header,
+    .panel-body,
+    .panel-footer {
+      padding: 14px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .panel-header small {
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .panel-footer {
+      border-top: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.018);
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field-grid.three {
+      grid-template-columns: 1fr 0.95fr 0.75fr;
+    }
+
+    .field {
+      min-width: 0;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .actions.between {
+      justify-content: space-between;
+    }
+
+    .journal-text {
+      min-height: 410px;
+      margin-top: 12px;
+    }
+
+    .week-strip {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(50px, 1fr));
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .day-pill {
+      min-height: 58px;
+      padding: 8px 3px;
+      text-align: center;
+      background: var(--panel-soft);
+      overflow: visible;
+    }
+
+    .day-pill strong,
+    .day-pill span {
+      display: block;
+      overflow: visible;
+      text-overflow: clip;
+      white-space: nowrap;
+    }
+
+    .day-pill strong {
+      font-size: 12px;
+    }
+
+    .day-pill span {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    .day-pill .day-total {
+      color: var(--accent-strong);
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 3px;
+    }
+
+    .day-pill.active {
+      border-color: var(--accent);
+      background: rgba(79, 209, 189, 0.12);
+    }
+
+    .day-pill.has-note strong::after,
+    .day-pill.has-expense strong::after {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin-left: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+      vertical-align: middle;
+    }
+
+    .journal-meta {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .expense-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .expense-form .note-field {
+      grid-column: 1 / -1;
+    }
+
+    .expense-form .submit-row {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .segment {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #121416;
+    }
+
+    .segment button {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      min-height: 34px;
+    }
+
+    .segment button.active {
+      background: var(--accent);
+      color: #071311;
+      font-weight: 700;
+    }
+
+    .summary-line {
+      color: var(--muted-strong);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 12px 0;
+      font-size: 14px;
+    }
+
+    .summary-line strong {
+      color: var(--text);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #121416;
+      max-height: 420px;
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 18px;
+      text-align: center;
+    }
+
+    .type-badge {
+      display: inline-block;
+      border: 1px solid rgba(79, 209, 189, 0.35);
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: var(--accent-strong);
+      background: rgba(79, 209, 189, 0.08);
+      white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .template-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0;
+    }
+
+    .token-button {
+      min-height: 30px;
+      padding: 0 8px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: 12px;
+      color: var(--accent-strong);
+      background: rgba(79, 209, 189, 0.08);
+    }
+
+    .template-text {
+      min-height: 230px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: 13px;
+    }
+
+    details.template-panel {
+      border-top: 1px solid var(--line);
+      margin-top: 12px;
+      padding-top: 12px;
+    }
+
+    details.template-panel summary {
+      cursor: pointer;
+      color: var(--muted-strong);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .report-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .report-source {
+      min-height: 420px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: 12px;
+    }
+
+    .source-hidden {
+      position: fixed;
+      left: -9999px;
+      top: 0;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .preview-frame {
+      width: 100%;
+      height: 420px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 30;
+      max-width: min(360px, calc(100vw - 36px));
+      transform: translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+      border: 1px solid rgba(79, 209, 189, 0.45);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #111617;
+      color: var(--text);
+      box-shadow: 0 12px 26px var(--shadow);
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 1220px) {
+      .workspace {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .report-panel {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .app {
+        width: min(100% - 20px, 720px);
+      }
+
+      .topbar,
+      .workspace,
+      .report-grid,
+      .field-grid,
+      .field-grid.three {
+        grid-template-columns: 1fr;
+      }
+
+      .metrics {
+        grid-template-columns: 1fr;
+        min-width: 0;
+      }
+
+      .week-strip {
+        grid-template-columns: repeat(7, minmax(50px, 1fr));
+      }
+
+      .expense-form {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+        color: #111;
+      }
+
+      .app {
+        width: auto;
+        padding: 0;
+      }
+
+      .topbar,
+      .journal-panel,
+      .expense-panel,
+      .panel-header,
+      .panel-body > :not(.report-grid),
+      .panel-footer,
+      .report-source,
+      .label[for="reportSource"] {
+        display: none !important;
+      }
+
+      .workspace,
+      .report-grid {
+        display: block;
+      }
+
+      .panel,
+      .preview-frame {
+        border: 0;
+        height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="title-block">
+        <h1>工作日报与周报生成器</h1>
+        <p class="save-state" id="saveState">准备就绪</p>
+      </div>
+      <div class="metrics" aria-label="统计">
+        <div class="metric">
+          <span>本周费用</span>
+          <strong id="weekTotal">￥0.00</strong>
+        </div>
+        <div class="metric">
+          <span>本月费用</span>
+          <strong id="monthTotal">￥0.00</strong>
+        </div>
+        <div class="metric">
+          <span>数据同步</span>
+          <div class="actions" style="margin-top:4px;gap:4px">
+            <button type="button" id="exportData" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px">导出</button>
+            <button type="button" id="importData" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px">导入</button>
+          </div>
+          <input type="file" id="importFile" accept=".json" style="display:none">
+        </div>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="panel journal-panel" aria-labelledby="journalTitle">
+        <div class="panel-header">
+          <h2 id="journalTitle">日报</h2>
+          <small id="journalWordCount">0 字</small>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label for="journalDate">日期</label>
+            <input id="journalDate" type="date">
+          </div>
+          <div class="field-grid" style="margin-bottom:10px">
+            <div class="field">
+              <label for="checkIn">上班打卡</label>
+              <input id="checkIn" type="time" step="60">
+            </div>
+            <div class="field">
+              <label for="checkOut">下班打卡</label>
+              <input id="checkOut" type="time" step="60">
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <label style="margin-top:4px"><input type="checkbox" id="isOffsite" style="width:auto;min-height:auto;margin-right:4px">外勤</label>
+            </div>
+          </div>
+          <div class="week-strip" id="weekStrip" aria-label="自然周"></div>
+          <textarea id="journalText" class="journal-text" spellcheck="true" placeholder="今天做了什么"></textarea>
+        </div>
+        <div class="panel-footer">
+          <div class="actions between">
+            <span class="journal-meta" id="journalMeta">未记录</span>
+            <div class="actions">
+              <button type="button" id="clearJournal" class="danger" title="清空当前日期">清空</button>
+              <button type="button" id="saveNow" class="primary" title="立即保存">保存</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel expense-panel" aria-labelledby="expenseTitle">
+        <div class="panel-header">
+          <h2 id="expenseTitle">费用</h2>
+          <small id="expenseRange">本周</small>
+        </div>
+        <div class="panel-body">
+          <form id="expenseForm" class="expense-form">
+            <input id="expenseDate" type="hidden" required>
+            <div class="field">
+              <label for="expenseType">类型</label>
+              <select id="expenseType">
+                <option>打车</option>
+                <option>地铁</option>
+                <option>餐饮</option>
+                <option>停车</option>
+                <option>其他</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="expenseAmount">金额</label>
+              <input id="expenseAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required>
+            </div>
+            <div class="field note-field">
+              <label for="expenseNote">备注</label>
+              <input id="expenseNote" type="text" maxlength="120" placeholder="项目、地点或说明">
+            </div>
+            <div class="submit-row">
+              <button type="submit" class="primary" title="添加费用">添加</button>
+            </div>
+          </form>
+
+          <div class="week-strip expense-week-strip" id="expenseWeekStrip" aria-label="费用周日期"></div>
+
+          <div class="actions between">
+            <div class="segment" role="tablist" aria-label="费用范围">
+              <button type="button" data-expense-view="week" class="active">本周</button>
+              <button type="button" data-expense-view="month">本月</button>
+              <button type="button" data-expense-view="all">全部</button>
+            </div>
+            <button type="button" id="clearExpenses" class="ghost danger" title="删除当前范围费用">清空范围</button>
+          </div>
+
+          <div class="summary-line" id="expenseSummary"></div>
+          <div class="table-wrap" id="expenseTableWrap"></div>
+        </div>
+      </section>
+
+      <section class="panel report-panel" aria-labelledby="reportTitle">
+        <div class="panel-header">
+          <h2 id="reportTitle">周报</h2>
+          <small id="reportRange">本周</small>
+        </div>
+        <div class="panel-body">
+          <div class="field-grid three">
+            <div class="field">
+              <label for="reportDate">周报日期</label>
+              <input id="reportDate" type="date">
+            </div>
+            <div class="field">
+              <label for="reportFileName">文件名</label>
+              <input id="reportFileName" type="text" value="周报.xlsx">
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <button type="button" id="generateReport" class="primary" title="生成周报">生成周报</button>
+            </div>
+          </div>
+
+          <details class="template-panel">
+            <summary>高级：导出模板</summary>
+            <div class="template-tools" aria-label="占位符">
+              <button type="button" class="token-button" data-token="{{DATE_RANGE}}">{{DATE_RANGE}}</button>
+              <button type="button" class="token-button" data-token="{{WORK_CONTENT}}">{{WORK_CONTENT}}</button>
+              <button type="button" class="token-button" data-token="{{EXPENSE_TABLE}}">{{EXPENSE_TABLE}}</button>
+              <button type="button" class="token-button" data-token="{{TOTAL_EXPENSE}}">{{TOTAL_EXPENSE}}</button>
+              <button type="button" class="token-button" data-token="{{XLS_WEEK_ROWS}}">{{XLS_WEEK_ROWS}}</button>
+              <button type="button" class="token-button" data-token="{{TOTAL_EXPENSE_NUMBER}}">{{TOTAL_EXPENSE_NUMBER}}</button>
+              <button type="button" id="restoreTemplate" class="ghost" title="恢复默认模板">恢复默认</button>
+            </div>
+            <textarea id="templateText" class="template-text" spellcheck="false"></textarea>
+          </details>
+
+          <div class="actions report-export-actions" style="margin-top: 12px;">
+            <span class="journal-meta source-hidden" id="reportMeta">未生成</span>
+            <button type="button" id="copyReport" class="source-hidden" title="复制生成后的 HTML" aria-hidden="true" tabindex="-1">复制HTML</button>
+            <button type="button" id="downloadReport" class="primary" title="下载 Excel 可打开的周报">下载周报</button>
+            <button type="button" id="printReport" title="打印生成后的周报">打印周报</button>
+          </div>
+
+          <details class="output-panel" id="outputPanel">
+            <summary>可选：查看导出预览</summary>
+            <textarea id="reportSource" class="source-hidden" spellcheck="false" readonly aria-hidden="true" tabindex="-1"></textarea>
+            <div class="report-grid">
+              <div class="field">
+                <span class="label">预览</span>
+                <iframe id="reportPreview" class="preview-frame" title="周报预览" sandbox=""></iframe>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const STORE_KEY = "daily-work-journal.v1";
+      const TEMPLATE_VERSION = 3;
+      const LEGACY_DEFAULT_TEMPLATE = `<section class="weekly-report">
+  <h1>工作周报</h1>
+  <p class="date-range">{{DATE_RANGE}}</p>
+
+  <h2>本周工作内容</h2>
+  {{WORK_CONTENT}}
+
+  <h2>费用报销</h2>
+  {{EXPENSE_TABLE}}
+  <p class="total-line">本周费用合计：{{TOTAL_EXPENSE}}</p>
+</section>`;
+      const DEFAULT_TEMPLATE = `<div class="excel-report xls-weekly-template" data-date-range="{{DATE_RANGE}}" data-total="{{TOTAL_EXPENSE_NUMBER}}">
+  <table class="weekly-xls-table" aria-label="工作周报">
+    <colgroup>
+      <col class="col-a">
+      <col class="col-b">
+      <col class="col-c">
+      <col class="col-d">
+      <col class="col-e">
+      <col class="col-f">
+      <col class="col-g">
+      <col class="col-h">
+      <col class="col-i">
+      <col class="col-j">
+      <col class="col-k">
+      <col class="col-l">
+      <col class="col-m">
+      <col class="col-n">
+      <col class="col-o">
+      <col class="col-p">
+    </colgroup>
+    <tbody>
+      <tr class="xls-top-row">
+        <td colspan="16" class="xls-top-cell">&nbsp;</td>
+      </tr>
+      <tr class="xls-identity-row">
+        <td colspan="16" class="xls-identity-cell">姓名：袁宏林&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;职位：&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;监督人：</td>
+      </tr>
+      <tr class="xls-title-row">
+        <td colspan="4" class="xls-section-title">本 周 工 作 记 录</td>
+        <td colspan="12" class="xls-section-title">本周报销款项</td>
+      </tr>
+      <tr class="xls-header-row">
+        <td colspan="3" rowspan="2" class="xls-main-header">具 体 时 间</td>
+        <td rowspan="2" class="xls-main-header">工作内容记录</td>
+        <td rowspan="2" class="xls-main-header">编号</td>
+        <td colspan="3" class="xls-main-header">交通</td>
+        <td colspan="4" class="xls-main-header">出差补助</td>
+        <td colspan="4" class="xls-main-header">其他费用金额</td>
+      </tr>
+      <tr class="xls-subheader-row">
+        <td>工具</td>
+        <td>金额</td>
+        <td>用途</td>
+        <td>天数</td>
+        <td class="xls-hidden-cell"></td>
+        <td>补助标准</td>
+        <td>金额</td>
+        <td>住宿</td>
+        <td>保险</td>
+        <td>快递</td>
+        <td>备注</td>
+      </tr>
+      {{XLS_WEEK_ROWS}}
+      <tr class="xls-spacer-row">
+        <td colspan="16">&nbsp;</td>
+      </tr>
+      <tr class="xls-summary-title-row">
+        <td colspan="4">本周工作总结</td>
+        <td colspan="12">下周工作计划</td>
+      </tr>
+      <tr class="xls-summary-head-row">
+        <td>任务</td>
+        <td colspan="3">本周完成主要工作</td>
+        <td>任务</td>
+        <td colspan="11">下周主要事项</td>
+      </tr>
+      <tr class="xls-summary-row">
+        <td>1</td>
+        <td colspan="3"></td>
+        <td>1</td>
+        <td colspan="11"></td>
+      </tr>
+      <tr class="xls-summary-row xls-alt-row">
+        <td>2</td>
+        <td colspan="3"></td>
+        <td>2</td>
+        <td colspan="11"></td>
+      </tr>
+      <tr class="xls-summary-row">
+        <td>3</td>
+        <td colspan="3"></td>
+        <td>3</td>
+        <td colspan="11"></td>
+      </tr>
+      <tr class="xls-summary-row xls-alt-row">
+        <td>4</td>
+        <td colspan="3"></td>
+        <td>4</td>
+        <td colspan="11"></td>
+      </tr>
+    </tbody>
+  </table>
+</div>`;
+
+      const state = loadState();
+      const els = {};
+      let persistTimer = 0;
+      let toastTimer = 0;
+
+      document.addEventListener("DOMContentLoaded", init);
+
+      function init() {
+        bindElements();
+        hydrateControls();
+        bindEvents();
+        renderAll();
+        setInterval(() => {
+          saveCurrentJournal();
+          persist("自动保存");
+        }, 30000);
+      }
+
+      function bindElements() {
+        [
+          "saveState",
+          "weekTotal",
+          "monthTotal",
+          "journalDays",
+          "journalDaysPreview",
+          "journalWordCount",
+          "journalDate",
+          "weekStrip",
+          "journalText",
+          "journalMeta",
+          "clearJournal",
+          "checkIn",
+          "checkOut",
+          "isOffsite",
+          "saveNow",
+          "expenseRange",
+          "expenseForm",
+          "expenseDate",
+          "expenseWeekStrip",
+          "expenseType",
+          "expenseAmount",
+          "expenseNote",
+          "clearExpenses",
+          "expenseSummary",
+          "expenseTableWrap",
+          "reportRange",
+          "reportDate",
+          "reportFileName",
+          "generateReport",
+          "templateText",
+          "restoreTemplate",
+          "reportMeta",
+          "copyReport",
+          "downloadReport",
+          "printReport",
+          "reportSource",
+          "reportPreview",
+          "toast",
+          "exportData",
+          "importData",
+          "importFile"
+        ].forEach((id) => {
+          els[id] = document.getElementById(id);
+        });
+      }
+
+      function hydrateControls() {
+        const today = toDateKey(new Date());
+        state.selectedDate = normalizeDateKey(state.selectedDate) || today;
+        state.reportDate = state.selectedDate;
+        state.expenseView = state.expenseView || "week";
+        state.journals = state.journals || {};
+      state.attendance = state.attendance || {};
+        sanitizeJournals();
+        state.expenses = Array.isArray(state.expenses) ? state.expenses : [];
+        if (!state.template || isLegacyDefaultTemplate(state.template) || isOutdatedExcelTemplate(state.template)) {
+          state.template = DEFAULT_TEMPLATE;
+        }
+        state.templateVersion = TEMPLATE_VERSION;
+        state.generatedReport = state.generatedReport || "";
+        state.reportFileName = normalizeReportFileName(state.reportFileName || "周报.xlsx");
+
+        els.journalDate.value = state.selectedDate;
+        els.journalText.value = state.journals[state.selectedDate] || "";
+        syncAttendanceFromState();
+        els.expenseDate.value = state.reportDate;
+        els.reportDate.value = state.reportDate;
+        els.reportFileName.value = state.reportFileName;
+        els.templateText.value = state.template;
+        els.reportSource.value = state.generatedReport;
+        els.reportPreview.srcdoc = state.generatedReport || emptyPreviewHtml();
+        updateExpenseViewButtons();
+      }
+
+      function bindEvents() {
+        els.journalDate.addEventListener("change", () => {
+          saveCurrentJournal();
+          state.selectedDate = normalizeDateKey(els.journalDate.value) || toDateKey(new Date());
+          els.journalDate.value = state.selectedDate;
+          syncWeekContext(state.selectedDate);
+          els.journalText.value = state.journals[state.selectedDate] || "";
+          syncAttendanceFromState();
+          renderJournal();
+          renderExpenses();
+          renderReportRange();
+          queuePersist();
+        });
+
+        els.journalText.addEventListener("input", () => {
+          saveCurrentJournal();
+          renderJournal();
+          queuePersist();
+        });
+
+        els.checkIn.addEventListener("change", () => { saveCurrentJournal(); queuePersist(); });
+        els.checkOut.addEventListener("change", () => { saveCurrentJournal(); queuePersist(); });
+        els.isOffsite.addEventListener("change", () => { saveCurrentJournal(); queuePersist(); });
+
+        els.saveNow.addEventListener("click", () => {
+          saveCurrentJournal();
+          persist("已保存");
+          toast("日报已保存");
+        });
+
+        els.clearJournal.addEventListener("click", () => {
+          if (!els.journalText.value.trim() || confirm("清空当前日期的日报？")) {
+            delete state.journals[els.journalDate.value];
+            els.journalText.value = "";
+            renderAll();
+            persist("已保存");
+            toast("当前日报已清空");
+          }
+        });
+
+        els.expenseForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          addExpense();
+        });
+
+        els.expenseDate.addEventListener("change", () => {
+          const dateKey = normalizeDateKey(els.expenseDate.value) || toDateKey(new Date());
+          els.expenseDate.value = dateKey;
+          state.reportDate = dateKey;
+          els.reportDate.value = dateKey;
+          renderStats();
+          renderExpenses();
+          renderReportRange();
+          queuePersist();
+        });
+
+        document.querySelectorAll("[data-expense-view]").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.expenseView = button.dataset.expenseView;
+            updateExpenseViewButtons();
+            renderExpenses();
+            queuePersist();
+          });
+        });
+
+        els.expenseTableWrap.addEventListener("click", (event) => {
+          const button = event.target.closest("[data-delete-expense]");
+          if (!button) return;
+          const expense = state.expenses.find((item) => item.id === button.dataset.deleteExpense);
+          if (expense && confirm("删除这条费用？")) {
+            state.expenses = state.expenses.filter((item) => item.id !== expense.id);
+            renderAll();
+            persist("已保存");
+            toast("费用已删除");
+          }
+        });
+
+        els.clearExpenses.addEventListener("click", () => {
+          const items = getVisibleExpenses();
+          if (!items.length) {
+            toast("当前范围没有费用");
+            return;
+          }
+          if (confirm(`删除当前范围的 ${items.length} 条费用？`)) {
+            const ids = new Set(items.map((item) => item.id));
+            state.expenses = state.expenses.filter((item) => !ids.has(item.id));
+            renderAll();
+            persist("已保存");
+            toast("费用范围已清空");
+          }
+        });
+
+        els.reportDate.addEventListener("change", () => {
+          state.reportDate = normalizeDateKey(els.reportDate.value) || toDateKey(new Date());
+          els.reportDate.value = state.reportDate;
+          els.expenseDate.value = state.reportDate;
+          renderStats();
+          renderExpenses();
+          renderReportRange();
+          queuePersist();
+        });
+
+        els.reportFileName.addEventListener("input", () => {
+          state.reportFileName = els.reportFileName.value.trim() || "周报.xlsx";
+          queuePersist();
+        });
+
+        els.templateText.addEventListener("input", () => {
+          state.template = els.templateText.value;
+          queuePersist();
+        });
+
+        document.querySelectorAll("[data-token]").forEach((button) => {
+          button.addEventListener("click", () => insertAtCursor(els.templateText, button.dataset.token));
+        });
+
+        els.restoreTemplate.addEventListener("click", () => {
+          if (confirm("恢复默认周报模板？")) {
+            state.template = DEFAULT_TEMPLATE;
+            els.templateText.value = DEFAULT_TEMPLATE;
+            queuePersist();
+            toast("模板已恢复");
+          }
+        });
+
+        els.generateReport.addEventListener("click", () => {
+          generateAndRenderReport();
+          toast("周报已生成");
+        });
+
+        els.copyReport.addEventListener("click", copyReport);
+        els.downloadReport.addEventListener("click", downloadReport);
+        els.printReport.addEventListener("click", printReport);
+
+        els.exportData.addEventListener("click", exportAllData);
+        els.importData.addEventListener("click", () => els.importFile.click());
+        els.importFile.addEventListener("change", importAllData);
+
+        window.addEventListener("beforeunload", () => {
+          saveCurrentJournal();
+          saveToStorage();
+        });
+      }
+
+      function addExpense() {
+        const date = normalizeDateKey(els.expenseDate.value);
+        const amount = Number.parseFloat(els.expenseAmount.value);
+        if (!date) {
+          toast("请选择费用日期");
+          return;
+        }
+        if (!Number.isFinite(amount) || amount <= 0) {
+          toast("请输入有效金额");
+          return;
+        }
+
+        state.expenses.push({
+          id: createId(),
+          date,
+          type: els.expenseType.value,
+          amount: roundMoney(amount),
+          note: els.expenseNote.value.trim()
+        });
+
+        state.reportDate = date;
+        els.reportDate.value = date;
+        state.expenses.sort((a, b) => a.date.localeCompare(b.date) || a.type.localeCompare(b.type));
+        els.expenseAmount.value = "";
+        els.expenseNote.value = "";
+        renderAll();
+        persist("已保存");
+        toast("费用已添加");
+      }
+
+      function renderAll() {
+        renderStats();
+        renderJournal();
+        renderExpenses();
+        renderReportRange();
+        updateSaveState("已保存到本地");
+      }
+
+      function renderStats() {
+        const bounds = getWorkWeekBounds(parseDateKey(state.reportDate));
+        const weekItems = state.expenses.filter((item) => isInRange(item.date, bounds.startKey, bounds.endKey));
+        const monthItems = state.expenses.filter((item) => isSameMonth(item.date, state.reportDate));
+        const writtenDays = getWorkdays(state.reportDate).filter((dateKey) => hasJournalEntry(dateKey));
+        els.weekTotal.textContent = formatMoney(sumExpenses(weekItems));
+        els.monthTotal.textContent = formatMoney(sumExpenses(monthItems));
+        els.journalDays.textContent = writtenDays.length;
+        els.journalDaysPreview.textContent = writtenDays.length
+          ? writtenDays.map((dateKey) => `${getWeekdayName(parseDateKey(dateKey))} ${formatMonthDay(dateKey)}`).join("、")
+          : "暂无记录";
+        els.journalDaysPreview.title = els.journalDaysPreview.textContent;
+      }
+
+      function renderJournal() {
+        const dateKey = els.journalDate.value || state.selectedDate;
+        const text = els.journalText.value || "";
+        const words = countChineseAware(text);
+        els.journalWordCount.textContent = `${words} 字`;
+        els.journalMeta.textContent = text.trim() ? `${formatDateCn(dateKey)} 已记录` : `${formatDateCn(dateKey)} 未记录`;
+        renderWeekStrip();
+        renderStats();
+      }
+
+      function renderWeekStrip() {
+        const active = els.journalDate.value || state.selectedDate;
+        const days = getWorkdays(active);
+        els.weekStrip.innerHTML = days.map((dateKey) => {
+          const date = parseDateKey(dateKey);
+          const hasNote = Boolean((state.journals[dateKey] || "").trim());
+          const classes = ["day-pill"];
+          if (dateKey === active) classes.push("active");
+          if (hasNote) classes.push("has-note");
+          return `<button type="button" class="${classes.join(" ")}" data-journal-day="${dateKey}">
+            <strong>${escapeHtml(getWeekdayName(date))}</strong>
+            <span>${escapeHtml(formatMonthDay(dateKey))}</span>
+          </button>`;
+        }).join("");
+
+        els.weekStrip.querySelectorAll("[data-journal-day]").forEach((button) => {
+          button.addEventListener("click", () => {
+            saveCurrentJournal();
+            state.selectedDate = button.dataset.journalDay;
+            els.journalDate.value = state.selectedDate;
+            syncWeekContext(state.selectedDate);
+            els.journalText.value = state.journals[state.selectedDate] || "";
+            syncAttendanceFromState();
+            renderJournal();
+            renderExpenses();
+            renderReportRange();
+            queuePersist();
+          });
+        });
+      }
+
+      function renderExpenseWeekStrip() {
+        const active = normalizeDateKey(els.expenseDate.value) || state.reportDate || toDateKey(new Date());
+        const days = getWorkdays(active);
+        const expensesByDate = groupExpensesByDate(state.expenses);
+        els.expenseWeekStrip.innerHTML = days.map((dateKey) => {
+          const date = parseDateKey(dateKey);
+          const dayItems = expensesByDate[dateKey] || [];
+          const total = sumExpenses(dayItems);
+          const classes = ["day-pill", "expense-day-pill"];
+          if (dateKey === active) classes.push("active");
+          if (dayItems.length) classes.push("has-expense");
+          return `<button type="button" class="${classes.join(" ")}" data-expense-day="${dateKey}">
+            <strong>${escapeHtml(getWeekdayName(date))}</strong>
+            <span>${escapeHtml(formatMonthDay(dateKey))}</span>
+            <span class="day-total">${dayItems.length ? escapeHtml(formatCompactMoney(total)) : "无"}</span>
+          </button>`;
+        }).join("");
+
+        els.expenseWeekStrip.querySelectorAll("[data-expense-day]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const dateKey = button.dataset.expenseDay;
+            els.expenseDate.value = dateKey;
+            state.reportDate = dateKey;
+            els.reportDate.value = dateKey;
+            state.expenseView = "week";
+            updateExpenseViewButtons();
+            renderStats();
+            renderExpenses();
+            renderReportRange();
+            queuePersist();
+          });
+        });
+      }
+
+      function renderExpenses() {
+        renderExpenseWeekStrip();
+        const items = getVisibleExpenses();
+        const rangeLabel = getExpenseRangeLabel();
+        const total = sumExpenses(items);
+        const byType = groupExpenseByType(items);
+        els.expenseRange.textContent = rangeLabel;
+        els.expenseSummary.innerHTML = [
+          `<span>${escapeHtml(rangeLabel)} <strong>${formatMoney(total)}</strong></span>`,
+          `<span>${items.length} 条</span>`,
+          ...Object.entries(byType).map(([type, value]) => `<span>${escapeHtml(type)} <strong>${formatMoney(value)}</strong></span>`)
+        ].join("");
+
+        if (!items.length) {
+          els.expenseTableWrap.innerHTML = `<div class="empty">暂无费用</div>`;
+          return;
+        }
+
+        const rows = items
+          .slice()
+          .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
+          .map((item) => `<tr>
+            <td>${escapeHtml(shortDate(item.date))}</td>
+            <td><span class="type-badge">${escapeHtml(item.type)}</span></td>
+            <td class="amount">${formatMoney(item.amount)}</td>
+            <td>${escapeHtml(item.note || "")}</td>
+            <td><button type="button" class="icon-only danger" title="删除费用" data-delete-expense="${escapeHtml(item.id)}">×</button></td>
+          </tr>`)
+          .join("");
+
+        els.expenseTableWrap.innerHTML = `<table>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>类型</th>
+              <th class="amount">金额</th>
+              <th>备注</th>
+              <th aria-label="操作"></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      }
+
+      function renderReportRange() {
+        const bounds = getWorkWeekBounds(parseDateKey(state.reportDate));
+        els.reportRange.textContent = `${shortDate(bounds.startKey)} 至 ${shortDate(bounds.endKey)}`;
+      }
+
+      function generateAndRenderReport() {
+        saveCurrentJournal();
+        state.template = els.templateText.value || DEFAULT_TEMPLATE;
+        state.reportDate = normalizeDateKey(els.reportDate.value) || toDateKey(new Date());
+        state.reportFileName = normalizeReportFileName(els.reportFileName.value || suggestedReportName());
+        els.reportFileName.value = state.reportFileName;
+        const report = buildReportHtml(fillTemplate(state.template, state.reportDate));
+        state.generatedReport = report;
+        els.reportSource.value = report;
+        els.reportPreview.srcdoc = report;
+        els.reportMeta.textContent = `${formatDateTime(new Date())} 生成`;
+        persist("已保存");
+      }
+
+      function fillTemplate(template, reportDateKey) {
+        const bounds = getWorkWeekBounds(parseDateKey(reportDateKey));
+        const expenseItems = state.expenses
+          .filter((item) => isInRange(item.date, bounds.startKey, bounds.endKey))
+          .sort((a, b) => a.date.localeCompare(b.date) || a.type.localeCompare(b.type));
+        const total = sumExpenses(expenseItems);
+        const replacements = {
+          DATE_RANGE: `${formatDateCn(bounds.startKey)} 至 ${formatDateCn(bounds.endKey)}`,
+          XLS_WEEK_ROWS: buildXlsWeekRowsHtml(bounds.startKey, expenseItems),
+          WORK_CONTENT: buildWorkContentHtml(bounds.startKey),
+          EXPENSE_TABLE: buildExpenseTableHtml(expenseItems),
+          TOTAL_EXPENSE: formatMoney(total),
+          TOTAL_EXPENSE_NUMBER: formatGeneralMoney(total)
+        };
+
+        return Object.entries(replacements).reduce((html, [key, value]) => {
+          return html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), value);
+        }, template);
+      }
+
+      function buildWorkContentHtml(startKey) {
+        return getWorkdays(startKey).map((dateKey) => {
+          const content = (state.journals[dateKey] || "").trim();
+          const att = state.attendance[dateKey] || {};
+          const attInfo = [att.checkIn ? `上班: ${att.checkIn}` : "", att.checkOut ? `下班: ${att.checkOut}` : "", att.isOffsite ? " [外勤]" : ""].filter(Boolean).join(" | ");
+          const header = attInfo ? `<div class="attendance-line">${escapeHtml(attInfo)}</div>` : "";
+          const body = content
+            ? `<div class="work-entry">${escapeHtml(content).replace(/\n/g, "<br>")}</div>`
+            : `<div class="work-entry muted">暂无记录</div>`;
+          return `<section class="work-day">
+            <h3>${escapeHtml(getWeekdayName(parseDateKey(dateKey)))} ${escapeHtml(formatDateCn(dateKey))}</h3>
+            ${header}
+            ${body}
+          </section>`;
+        }).join("\n");
+      }
+
+      function buildXlsWeekRowsHtml(startKey, expenseItems) {
+        const days = getWorkdays(startKey);
+        const expensesByDate = groupExpensesByDate(expenseItems);
+        const total = sumExpenses(expenseItems);
+
+        return days.map((dateKey, dayIndex) => {
+          const dayExpenses = expensesByDate[dateKey] || [];
+          const lineLimit = dayIndex === 6 ? 1 : 2;
+          const expenseLines = compactExpenseLines(dayExpenses, lineLimit);
+          const firstLine = expenseLines[0] || null;
+          const secondLine = expenseLines[1] || null;
+          const content = (state.journals[dateKey] || "").trim();
+          const weekday = getWeekdayNameFull(parseDateKey(dateKey));
+          const workText = content ? escapeHtml(content).replace(/\n/g, "<br>") : "";
+          const topCells = [
+            `<td colspan="2" rowspan="2" class="xls-center xls-weekday">${escapeHtml(weekday)}</td>`,
+            `<td rowspan="2" class="xls-center xls-date">${escapeHtml(formatMonthDay(dateKey))}</td>`,
+            `<td rowspan="2" class="xls-work-cell">${workText}</td>`,
+            buildXlsExpenseCells(firstLine)
+          ].join("");
+
+          const bottomExpenseCells = dayIndex === 6
+            ? buildXlsTotalCells(total)
+            : buildXlsExpenseCells(secondLine);
+
+          return `<tr class="xls-day-row xls-day-top">${topCells}</tr>
+      <tr class="xls-day-row xls-day-bottom">${bottomExpenseCells}</tr>`;
+        }).join("\n      ");
+      }
+
+      function buildXlsExpenseCells(expense) {
+        const tool = expense ? escapeHtml(expense.type) : "";
+        const amount = expense ? escapeHtml(formatGeneralMoney(expense.amount)) : "";
+        const note = expense ? escapeHtml(expense.note || "") : "";
+        return `<td class="xls-center"></td>
+        <td class="xls-center">${tool}</td>
+        <td class="xls-center xls-money">${amount}</td>
+        <td class="xls-center">${note}</td>
+        <td class="xls-center"></td>
+        <td class="xls-hidden-cell"></td>
+        <td class="xls-center"></td>
+        <td class="xls-center"></td>
+        <td class="xls-center"></td>
+        <td class="xls-center"></td>
+        <td class="xls-center"></td>
+        <td class="xls-center"></td>`;
+      }
+
+      function buildXlsTotalCells(total) {
+        return `<td class="xls-center"></td>
+        <td class="xls-center"></td>
+        <td class="xls-center xls-money">${escapeHtml(formatGeneralMoney(total))}</td>
+        <td class="xls-center"></td>
+        <td class="xls-center"></td>
+        <td class="xls-hidden-cell"></td>
+        <td class="xls-center"></td>
+        <td class="xls-center"></td>
+        <td class="xls-center"></td>
+        <td class="xls-center"></td>
+        <td class="xls-center"></td>
+        <td class="xls-center"></td>`;
+      }
+
+      function buildExpenseTableHtml(items) {
+        if (!items.length) {
+          return `<p class="muted">本周暂无费用。</p>`;
+        }
+
+        const rows = items.map((item) => `<tr>
+          <td>${escapeHtml(formatDateCn(item.date))}</td>
+          <td>${escapeHtml(item.type)}</td>
+          <td class="amount">${formatMoney(item.amount)}</td>
+          <td>${escapeHtml(item.note || "")}</td>
+        </tr>`).join("");
+
+        return `<table class="expense-report-table">
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>类型</th>
+              <th class="amount">金额</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+            <tr class="total-row">
+              <td colspan="2">合计</td>
+              <td class="amount">${formatMoney(sumExpenses(items))}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>`;
+      }
+
+      function buildReportHtml(content) {
+        if (/<!doctype\s+html/i.test(content) || /<html[\s>]/i.test(content)) {
+          return content;
+        }
+
+        return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>工作周报</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 0.75in 0.7in;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      color: #000;
+      background: #eef1ea;
+      font-family: "幼圆", "YouYuan", "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, sans-serif;
+      line-height: 1.35;
+    }
+
+    .excel-report {
+      width: min(1250px, calc(100vw - 48px));
+      min-width: 1040px;
+      margin: 0 auto;
+      background: #fff;
+      overflow-x: auto;
+    }
+
+    .weekly-xls-table {
+      width: 100%;
+      margin: 0;
+      table-layout: fixed;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 10pt;
+      mso-displayed-decimal-separator: ".";
+      mso-displayed-thousand-separator: ",";
+    }
+
+    .weekly-xls-table .col-a { width: 3.05%; }
+    .weekly-xls-table .col-b { width: 2.10%; }
+    .weekly-xls-table .col-c { width: 5.44%; }
+    .weekly-xls-table .col-d { width: 32.73%; }
+    .weekly-xls-table .col-e { width: 3.56%; }
+    .weekly-xls-table .col-f { width: 4.28%; }
+    .weekly-xls-table .col-g { width: 5.52%; }
+    .weekly-xls-table .col-h { width: 8.56%; }
+    .weekly-xls-table .col-i { width: 4.35%; }
+    .weekly-xls-table .col-j { width: 0; display: none; }
+    .weekly-xls-table .col-k { width: 5.37%; }
+    .weekly-xls-table .col-l { width: 5.15%; }
+    .weekly-xls-table .col-m { width: 4.86%; }
+    .weekly-xls-table .col-n,
+    .weekly-xls-table .col-o,
+    .weekly-xls-table .col-p { width: 5.01%; }
+
+    .weekly-xls-table td {
+      border: 0.5pt solid #9bbb59;
+      padding: 2px 4px;
+      color: #000;
+      text-align: center;
+      vertical-align: middle;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .weekly-xls-table .xls-hidden-cell {
+      display: none;
+      width: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .xls-top-row td {
+      height: 32.25pt;
+      background: #d5e2ba;
+    }
+
+    .xls-identity-row td {
+      height: 24pt;
+      background: #d5e2ba;
+      font-weight: 700;
+    }
+
+    .xls-identity-cell {
+      text-align: center;
+      white-space: nowrap;
+      word-break: normal;
+      overflow-wrap: normal;
+    }
+
+    .xls-title-row td,
+    .xls-summary-title-row td {
+      height: 27pt;
+      font-size: 14pt;
+      font-weight: 700;
+      background: #d5e2ba;
+    }
+
+    .xls-header-row td {
+      height: 21pt;
+      font-weight: 700;
+    }
+
+    .xls-subheader-row td {
+      height: 26pt;
+    }
+
+    .xls-day-top td {
+      height: 26pt;
+    }
+
+    .xls-day-bottom td {
+      height: 25pt;
+    }
+
+    .xls-weekday,
+    .xls-date {
+      font-size: 10pt;
+    }
+
+    .xls-work-cell {
+      text-align: center;
+      line-height: 1.35;
+    }
+
+    .xls-money {
+      text-align: center;
+    }
+
+    .xls-spacer-row td {
+      height: 18.75pt;
+    }
+
+    .xls-summary-head-row td {
+      height: 21pt;
+      background: #d5e2ba;
+      font-weight: 700;
+    }
+
+    .xls-summary-head-row td:nth-child(2),
+    .xls-summary-head-row td:nth-child(4) {
+      font-size: 12pt;
+    }
+
+    .xls-summary-row td {
+      height: 13.5pt;
+      font-size: 8pt;
+    }
+
+    .xls-alt-row td {
+      background: #d5e2ba;
+    }
+
+    .weekly-report {
+      width: min(900px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 34px;
+      background: #fff;
+      border: 1px solid #d8ddd5;
+      border-radius: 8px;
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, sans-serif;
+      line-height: 1.72;
+    }
+
+    .weekly-report h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+
+    .weekly-report h2 {
+      margin: 28px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #24352f;
+      font-size: 19px;
+      letter-spacing: 0;
+    }
+
+    .weekly-report h3 {
+      margin: 18px 0 8px;
+      color: #24352f;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    .date-range,
+    .muted {
+      color: #69716d;
+    }
+
+    .work-day {
+      margin: 12px 0;
+      padding: 12px 14px;
+      border-left: 4px solid #4b8f82;
+      background: #f8faf7;
+    }
+
+    .work-entry {
+      white-space: normal;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+    th,
+    td {
+      border: 1px solid #d8ddd5;
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef2ed;
+    }
+    .amount {
+      text-align: right;
+      white-space: nowrap;
+    }
+    .total-row td {
+      font-weight: 700;
+      background: #f6f0df;
+    }
+    .total-line {
+      font-size: 17px;
+      font-weight: 700;
+      text-align: right;
+    }
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .excel-report {
+        width: 100%;
+        min-width: 0;
+        overflow: visible;
+      }
+      .weekly-xls-table {
+        font-size: 7pt;
+      }
+      .weekly-xls-table td {
+        padding: 1pt 2pt;
+      }
+      .weekly-report {
+        width: auto;
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+${content}
+</body>
+</html>`;
+      }
+
+      function emptyPreviewHtml() {
+        return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>
+          body { margin: 0; display: grid; place-items: center; min-height: 100vh; font: 14px "Microsoft YaHei", sans-serif; color: #626b68; background: #f5f6f2; }
+        </style></head><body>暂无预览</body></html>`;
+      }
+
+      function buildXlsxBlob(reportDateKey) {
+        const files = buildXlsxFiles(reportDateKey);
+        return new Blob([zipFiles(files)], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        });
+      }
+
+      function buildXlsxFiles(reportDateKey) {
+        const sheetXml = buildWorksheetXml(reportDateKey);
+        const created = new Date().toISOString();
+        return [
+          {
+            name: "[Content_Types].xml",
+            content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`
+          },
+          {
+            name: "_rels/.rels",
+            content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>`
+          },
+          {
+            name: "docProps/core.xml",
+            content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>工作周报</dc:title>
+  <dc:creator>工作周报生成器</dc:creator>
+  <cp:lastModifiedBy>工作周报生成器</cp:lastModifiedBy>
+  <dcterms:created xsi:type="dcterms:W3CDTF">${created}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">${created}</dcterms:modified>
+</cp:coreProperties>`
+          },
+          {
+            name: "docProps/app.xml",
+            content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>Microsoft Excel</Application>
+  <DocSecurity>0</DocSecurity>
+  <ScaleCrop>false</ScaleCrop>
+  <HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>工作表</vt:lpstr></vt:variant><vt:variant><vt:i4>1</vt:i4></vt:variant></vt:vector></HeadingPairs>
+  <TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>周报</vt:lpstr></vt:vector></TitlesOfParts>
+</Properties>`
+          },
+          {
+            name: "xl/workbook.xml",
+            content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <fileVersion appName="xl" lastEdited="7" lowestEdited="7" rupBuild="23426"/>
+  <workbookPr defaultThemeVersion="166925"/>
+  <sheets>
+    <sheet name="周报" sheetId="1" r:id="rId1"/>
+  </sheets>
+  <calcPr calcId="191029"/>
+</workbook>`
+          },
+          {
+            name: "xl/_rels/workbook.xml.rels",
+            content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`
+          },
+          {
+            name: "xl/styles.xml",
+            content: buildXlsxStylesXml()
+          },
+          {
+            name: "xl/worksheets/sheet1.xml",
+            content: sheetXml
+          }
+        ];
+      }
+
+      function buildWorksheetXml(reportDateKey) {
+        const data = buildWorksheetData(reportDateKey);
+        const colsXml = [
+          [1, 1, 4.63],
+          [2, 2, 3],
+          [3, 3, 8.75],
+          [4, 4, 55.75],
+          [5, 5, 5.5],
+          [6, 6, 6.75],
+          [7, 7, 8.88],
+          [8, 8, 14.13],
+          [9, 9, 6.88],
+          [10, 10, 0, true],
+          [11, 11, 8.63],
+          [12, 12, 8.25],
+          [13, 13, 7.75],
+          [14, 16, 8]
+        ].map(([min, max, width, hidden]) => {
+          const hiddenAttr = hidden ? ` hidden="1"` : "";
+          return `<col min="${min}" max="${max}" width="${width}" customWidth="1"${hiddenAttr}/>`;
+        }).join("");
+        const rowHeights = [32.25, 24, 27, 21, 26, 26, 27, 26, 21, 25, 22, 24, 27, 25, 25, 25, 25, 26, 24, 18.75, 23.25, 21, 13.5, 13.5, 13.5, 13.5];
+        const rowsXml = data.rows.map((row, rowIndex) => {
+          const rowNumber = rowIndex + 1;
+          const cellsXml = row.map((cell, colIndex) => buildXlsxCellXml(rowNumber, colIndex + 1, cell)).join("");
+          return `<row r="${rowNumber}" ht="${rowHeights[rowIndex]}" customHeight="1">${cellsXml}</row>`;
+        }).join("");
+        const mergesXml = data.merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
+        return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheetPr>
+    <pageSetUpPr fitToPage="1"/>
+  </sheetPr>
+  <dimension ref="A1:P26"/>
+  <sheetViews>
+    <sheetView showGridLines="0" workbookViewId="0"/>
+  </sheetViews>
+  <sheetFormatPr defaultRowHeight="15"/>
+  <cols>${colsXml}</cols>
+  <sheetData>${rowsXml}</sheetData>
+  <mergeCells count="${data.merges.length}">${mergesXml}</mergeCells>
+  <pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>
+  <pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="1"/>
+</worksheet>`;
+      }
+
+      function buildWorksheetData(reportDateKey) {
+        const rows = Array.from({ length: 26 }, () => Array.from({ length: 16 }, () => ({ value: "", style: 1 })));
+        const set = (row, col, value, style = 1) => {
+          rows[row - 1][col - 1] = { value, style };
+        };
+        const styleRow = (row, style) => {
+          for (let col = 1; col <= 16; col++) {
+            rows[row - 1][col - 1].style = style;
+          }
+        };
+
+        styleRow(1, 5);
+        styleRow(2, 2);
+        styleRow(3, 3);
+        styleRow(21, 3);
+        styleRow(22, 4);
+        styleRow(24, 6);
+        styleRow(26, 6);
+
+        set(2, 1, "姓名：袁宏林                                                职位：                                                监督人：", 2);
+        set(3, 1, "本 周 工 作 记 录", 3);
+        set(3, 5, "本周报销款项", 3);
+        set(4, 1, "具 体 时 间", 4);
+        set(4, 4, "工作内容记录", 4);
+        set(4, 5, "编号", 4);
+        set(4, 6, "交通", 4);
+        set(4, 9, "出差补助", 4);
+        set(4, 13, "其他费用金额", 4);
+        set(5, 6, "工具");
+        set(5, 7, "金额");
+        set(5, 8, "用途");
+        set(5, 9, "天数");
+        set(5, 11, "补助标准");
+        set(5, 12, "金额");
+        set(5, 13, "住宿");
+        set(5, 14, "保险");
+        set(5, 15, "快递");
+        set(5, 16, "备注");
+
+        const bounds = getWorkWeekBounds(parseDateKey(reportDateKey));
+        const weekExpenses = state.expenses
+          .filter((item) => isInRange(item.date, bounds.startKey, bounds.endKey))
+          .sort((a, b) => a.date.localeCompare(b.date) || a.type.localeCompare(b.type));
+        const expensesByDate = groupExpensesByDate(weekExpenses);
+        const total = sumExpenses(weekExpenses);
+        getWorkdays(reportDateKey).forEach((dateKey, index) => {
+          const topRow = 6 + index * 2;
+          const bottomRow = topRow + 1;
+          const lineLimit = index === 6 ? 1 : 2;
+          const expenseLines = compactExpenseLines(expensesByDate[dateKey] || [], lineLimit);
+          set(topRow, 1, getWeekdayNameFull(parseDateKey(dateKey)));
+          set(topRow, 3, formatMonthDay(dateKey));
+          set(topRow, 4, String(state.journals[dateKey] || "").trim());
+          applyExpenseToRow(rows, topRow, expenseLines[0]);
+          if (index === 6) {
+            set(bottomRow, 7, total);
+          } else {
+            applyExpenseToRow(rows, bottomRow, expenseLines[1]);
+          }
+        });
+
+        set(21, 1, "本周工作总结", 3);
+        set(21, 5, "下周工作计划", 3);
+        set(22, 1, "任务", 4);
+        set(22, 2, "本周完成主要工作", 4);
+        set(22, 5, "任务", 4);
+        set(22, 6, "下周主要事项", 4);
+        for (let i = 0; i < 4; i++) {
+          set(23 + i, 1, i + 1, i % 2 ? 6 : 7);
+          set(23 + i, 5, i + 1, i % 2 ? 6 : 7);
+        }
+
+        return {
+          rows,
+          merges: buildWorksheetMerges()
+        };
+      }
+
+      function applyExpenseToRow(rows, rowNumber, expense) {
+        if (!expense) return;
+        rows[rowNumber - 1][5] = { value: expense.type || "", style: 1 };
+        rows[rowNumber - 1][6] = { value: roundMoney(expense.amount || 0), style: 1 };
+        rows[rowNumber - 1][7] = { value: expense.note || "", style: 1 };
+      }
+
+      function buildWorksheetMerges() {
+        const merges = [
+          "A1:P1", "A2:P2", "A3:D3", "E3:P3", "A4:C5", "D4:D5",
+          "E4:E5", "F4:H4", "I4:L4", "M4:P4", "A20:P20",
+          "A21:D21", "E21:P21", "B22:D22", "F22:P22",
+          "B23:D23", "F23:P23", "B24:D24", "F24:P24",
+          "B25:D25", "F25:P25", "B26:D26", "F26:P26"
+        ];
+        [6, 8, 10, 12, 14, 16, 18].forEach((row) => {
+          merges.push(`A${row}:B${row + 1}`, `C${row}:C${row + 1}`, `D${row}:D${row + 1}`);
+        });
+        return merges;
+      }
+
+      function buildXlsxCellXml(row, col, cell) {
+        const ref = `${columnName(col)}${row}`;
+        const style = cell.style || 1;
+        if (typeof cell.value === "number" && Number.isFinite(cell.value)) {
+          return `<c r="${ref}" s="${style}"><v>${cell.value}</v></c>`;
+        }
+        const text = String(cell.value || "");
+        if (!text) {
+          return `<c r="${ref}" s="${style}"/>`;
+        }
+        return `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${escapeXml(text)}</t></is></c>`;
+      }
+
+      function columnName(index) {
+        let name = "";
+        let current = index;
+        while (current > 0) {
+          const remainder = (current - 1) % 26;
+          name = String.fromCharCode(65 + remainder) + name;
+          current = Math.floor((current - 1) / 26);
+        }
+        return name;
+      }
+
+      function buildXlsxStylesXml() {
+        const border = `<border><left style="thin"><color rgb="FF9BBB59"/></left><right style="thin"><color rgb="FF9BBB59"/></right><top style="thin"><color rgb="FF9BBB59"/></top><bottom style="thin"><color rgb="FF9BBB59"/></bottom><diagonal/></border>`;
+        const alignment = `horizontal="center" vertical="center" wrapText="1"`;
+        return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="5">
+    <font><sz val="10"/><name val="幼圆"/><family val="2"/><charset val="134"/></font>
+    <font><b/><sz val="10"/><name val="幼圆"/><family val="2"/><charset val="134"/></font>
+    <font><b/><sz val="14"/><name val="幼圆"/><family val="2"/><charset val="134"/></font>
+    <font><b/><sz val="12"/><name val="幼圆"/><family val="2"/><charset val="134"/></font>
+    <font><sz val="8"/><name val="幼圆"/><family val="2"/><charset val="134"/></font>
+  </fonts>
+  <fills count="3">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFD5E2BA"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border><left/><right/><top/><bottom/><diagonal/></border>
+    ${border}
+  </borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="8">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment ${alignment}/></xf>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment ${alignment}/></xf>
+    <xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment ${alignment}/></xf>
+    <xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment ${alignment}/></xf>
+    <xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment ${alignment}/></xf>
+    <xf numFmtId="0" fontId="4" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment ${alignment}/></xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment ${alignment}/></xf>
+  </cellXfs>
+  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+  <dxfs count="0"/>
+  <tableStyles count="0" defaultTableStyle="TableStyleMedium9" defaultPivotStyle="PivotStyleLight16"/>
+</styleSheet>`;
+      }
+
+      function zipFiles(files) {
+        const encoder = new TextEncoder();
+        const localParts = [];
+        const centralParts = [];
+        let offset = 0;
+        files.forEach((file) => {
+          const nameBytes = encoder.encode(file.name);
+          const data = encoder.encode(file.content);
+          const crc = crc32(data);
+          const localHeader = new Uint8Array(30 + nameBytes.length);
+          const localView = new DataView(localHeader.buffer);
+          localView.setUint32(0, 0x04034b50, true);
+          localView.setUint16(4, 20, true);
+          localView.setUint16(6, 0, true);
+          localView.setUint16(8, 0, true);
+          localView.setUint16(10, 0, true);
+          localView.setUint16(12, 0, true);
+          localView.setUint32(14, crc, true);
+          localView.setUint32(18, data.length, true);
+          localView.setUint32(22, data.length, true);
+          localView.setUint16(26, nameBytes.length, true);
+          localView.setUint16(28, 0, true);
+          localHeader.set(nameBytes, 30);
+          localParts.push(localHeader, data);
+
+          const centralHeader = new Uint8Array(46 + nameBytes.length);
+          const centralView = new DataView(centralHeader.buffer);
+          centralView.setUint32(0, 0x02014b50, true);
+          centralView.setUint16(4, 20, true);
+          centralView.setUint16(6, 20, true);
+          centralView.setUint16(8, 0, true);
+          centralView.setUint16(10, 0, true);
+          centralView.setUint16(12, 0, true);
+          centralView.setUint16(14, 0, true);
+          centralView.setUint32(16, crc, true);
+          centralView.setUint32(20, data.length, true);
+          centralView.setUint32(24, data.length, true);
+          centralView.setUint16(28, nameBytes.length, true);
+          centralView.setUint16(30, 0, true);
+          centralView.setUint16(32, 0, true);
+          centralView.setUint16(34, 0, true);
+          centralView.setUint16(36, 0, true);
+          centralView.setUint32(38, 0, true);
+          centralView.setUint32(42, offset, true);
+          centralHeader.set(nameBytes, 46);
+          centralParts.push(centralHeader);
+          offset += localHeader.length + data.length;
+        });
+
+        const centralSize = centralParts.reduce((total, part) => total + part.length, 0);
+        const end = new Uint8Array(22);
+        const endView = new DataView(end.buffer);
+        endView.setUint32(0, 0x06054b50, true);
+        endView.setUint16(8, files.length, true);
+        endView.setUint16(10, files.length, true);
+        endView.setUint32(12, centralSize, true);
+        endView.setUint32(16, offset, true);
+        return concatUint8Arrays([...localParts, ...centralParts, end]);
+      }
+
+      function concatUint8Arrays(parts) {
+        const total = parts.reduce((sum, part) => sum + part.length, 0);
+        const output = new Uint8Array(total);
+        let offset = 0;
+        parts.forEach((part) => {
+          output.set(part, offset);
+          offset += part.length;
+        });
+        return output;
+      }
+
+      function crc32(bytes) {
+        if (!crc32.table) {
+          crc32.table = Array.from({ length: 256 }, (_, index) => {
+            let value = index;
+            for (let bit = 0; bit < 8; bit++) {
+              value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+            }
+            return value >>> 0;
+          });
+        }
+        let crc = 0xffffffff;
+        for (let index = 0; index < bytes.length; index++) {
+          crc = crc32.table[(crc ^ bytes[index]) & 0xff] ^ (crc >>> 8);
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+
+      async function copyReport() {
+        const report = ensureReport();
+        try {
+          await navigator.clipboard.writeText(report);
+          toast("HTML 已复制");
+        } catch (error) {
+          els.reportSource.focus();
+          els.reportSource.select();
+          document.execCommand("copy");
+          window.getSelection().removeAllRanges();
+          toast("HTML 已复制");
+        }
+      }
+
+      function downloadReport() {
+        generateAndRenderReport();
+        const blob = buildXlsxBlob(state.reportDate);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = cleanExcelFileName(els.reportFileName.value) || suggestedReportName();
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        toast("周报已下载");
+      }
+
+      function printReport() {
+        const report = ensureReport();
+        const win = window.open("", "_blank");
+        if (!win) {
+          toast("弹窗被拦截，可先下载周报");
+          return;
+        }
+        win.document.open();
+        win.document.write(report);
+        win.document.close();
+        win.focus();
+        setTimeout(() => win.print(), 250);
+      }
+
+      function ensureReport() {
+        if (!state.generatedReport) {
+          generateAndRenderReport();
+        }
+        return state.generatedReport;
+      }
+
+      function getVisibleExpenses() {
+        const view = state.expenseView || "week";
+        if (view === "all") {
+          return state.expenses.slice();
+        }
+        if (view === "month") {
+          return state.expenses.filter((item) => isSameMonth(item.date, state.reportDate));
+        }
+        const bounds = getWorkWeekBounds(parseDateKey(state.reportDate));
+        return state.expenses.filter((item) => isInRange(item.date, bounds.startKey, bounds.endKey));
+      }
+
+      function getExpenseRangeLabel() {
+        if (state.expenseView === "all") {
+          return "全部";
+        }
+        if (state.expenseView === "month") {
+          const date = parseDateKey(state.reportDate);
+          return `${date.getFullYear()}年${pad2(date.getMonth() + 1)}月`;
+        }
+        const bounds = getWorkWeekBounds(parseDateKey(state.reportDate));
+        return `${shortDate(bounds.startKey)} 至 ${shortDate(bounds.endKey)}`;
+      }
+
+      function updateExpenseViewButtons() {
+        document.querySelectorAll("[data-expense-view]").forEach((button) => {
+          button.classList.toggle("active", button.dataset.expenseView === state.expenseView);
+        });
+      }
+
+      function syncAttendanceFromState() {
+        const dateKey = state.selectedDate;
+        const att = state.attendance[dateKey] || {};
+        els.checkIn.value = att.checkIn || "";
+        els.checkOut.value = att.checkOut || "";
+        els.isOffsite.checked = !!att.isOffsite;
+      }
+
+      function saveCurrentJournal() {
+        const dateKey = normalizeDateKey(els.journalDate.value) || toDateKey(new Date());
+        state.selectedDate = dateKey;
+        setJournalEntry(dateKey, els.journalText.value);
+        state.attendance[dateKey] = {
+          checkIn: els.checkIn.value || "",
+          checkOut: els.checkOut.value || "",
+          isOffsite: !!els.isOffsite.checked
+        };
+      }
+
+      function syncWeekContext(dateKey) {
+        const normalized = normalizeDateKey(dateKey) || toDateKey(new Date());
+        state.reportDate = normalized;
+        els.reportDate.value = normalized;
+        els.expenseDate.value = normalized;
+        state.expenseView = "week";
+        updateExpenseViewButtons();
+      }
+
+      function setJournalEntry(dateKey, text) {
+        const value = String(text || "");
+        if (value.trim()) {
+          state.journals[dateKey] = value;
+        } else {
+          delete state.journals[dateKey];
+        }
+      }
+
+      function hasJournalEntry(dateKey) {
+        return Boolean(String(state.journals[dateKey] || "").trim());
+      }
+
+      function sanitizeJournals() {
+        Object.keys(state.journals).forEach((dateKey) => {
+          if (!normalizeDateKey(dateKey) || !hasJournalEntry(dateKey)) {
+            delete state.journals[dateKey];
+          }
+        });
+      }
+
+      function queuePersist() {
+        updateSaveState("正在保存...");
+        clearTimeout(persistTimer);
+        persistTimer = setTimeout(() => persist("已保存"), 450);
+      }
+
+      function persist(message) {
+        saveCurrentJournal();
+        if (saveToStorage()) {
+          updateSaveState(message || "已保存");
+        }
+      }
+
+      function saveToStorage() {
+        try {
+          localStorage.setItem(STORE_KEY, JSON.stringify(state));
+          return true;
+        } catch (error) {
+          updateSaveState("本地保存失败");
+          toast("localStorage 保存失败");
+          return false;
+        }
+      }
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORE_KEY);
+          if (!raw) return createDefaultState();
+          return { ...createDefaultState(), ...JSON.parse(raw) };
+        } catch (error) {
+          return createDefaultState();
+        }
+      }
+
+      function exportAllData() {
+        saveCurrentJournal();
+        const data = JSON.stringify(state, null, 2);
+        const blob = new Blob([data], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `work-journal-backup-${toDateKey(new Date())}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        toast("数据已导出");
+      }
+
+      function importAllData() {
+        const file = els.importFile.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const imported = JSON.parse(e.target.result);
+            if (!imported.journals && !imported.expenses) {
+              toast("无效的备份文件");
+              return;
+            }
+            if (confirm("导入将覆盖当前数据，确定继续？")) {
+              imported.selectedDate = imported.selectedDate || toDateKey(new Date());
+              imported.reportDate = imported.reportDate || imported.selectedDate;
+              imported.expenseView = imported.expenseView || "week";
+              imported.generatedReport = imported.generatedReport || "";
+              imported.template = imported.template || state.template;
+              imported.attendance = imported.attendance || {};
+              imported.reportFileName = imported.reportFileName || "周报.xlsx";
+              Object.assign(state, imported);
+              saveToStorage();
+              hydrateControls();
+              renderAll();
+              toast("数据已导入并保存");
+            }
+          } catch (err) {
+            toast("文件解析失败");
+          }
+        };
+        reader.readAsText(file);
+        els.importFile.value = "";
+      }
+
+      function createDefaultState() {
+        const today = toDateKey(new Date());
+        return {
+          selectedDate: today,
+          reportDate: today,
+          expenseView: "week",
+          journals: {},
+          expenses: [],
+          template: DEFAULT_TEMPLATE,
+          templateVersion: TEMPLATE_VERSION,
+          generatedReport: "",
+          reportFileName: "周报.xlsx"
+        };
+      }
+
+      function isLegacyDefaultTemplate(template) {
+        const normalized = String(template || "").trim();
+        return normalized === LEGACY_DEFAULT_TEMPLATE.trim()
+          || normalized.includes("<h1>工作周报</h1>");
+      }
+
+      function isOutdatedExcelTemplate(template) {
+        const normalized = String(template || "");
+        return normalized.includes("weekly-xls-table")
+          && normalized.includes("<span>姓名：袁宏林</span>");
+      }
+
+      function updateSaveState(message) {
+        els.saveState.textContent = `${message} · ${formatDateTime(new Date())}`;
+      }
+
+      function toast(message) {
+        clearTimeout(toastTimer);
+        els.toast.textContent = message;
+        els.toast.classList.add("show");
+        toastTimer = setTimeout(() => els.toast.classList.remove("show"), 2200);
+      }
+
+      function insertAtCursor(textarea, token) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const before = textarea.value.slice(0, start);
+        const after = textarea.value.slice(end);
+        textarea.value = `${before}${token}${after}`;
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = start + token.length;
+        textarea.dispatchEvent(new Event("input"));
+      }
+
+      function getWorkdays(referenceKey) {
+        const start = getWorkWeekBounds(parseDateKey(referenceKey)).start;
+        return Array.from({ length: 7 }, (_, index) => toDateKey(addDays(start, index)));
+      }
+
+      function getWorkWeekBounds(date) {
+        const start = getMonday(date);
+        const end = addDays(start, 6);
+        return {
+          start,
+          end,
+          startKey: toDateKey(start),
+          endKey: toDateKey(end)
+        };
+      }
+
+      function getMonday(date) {
+        const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const day = copy.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        copy.setDate(copy.getDate() + diff);
+        return copy;
+      }
+
+      function addDays(date, days) {
+        const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        copy.setDate(copy.getDate() + days);
+        return copy;
+      }
+
+      function parseDateKey(dateKey) {
+        const normalized = normalizeDateKey(dateKey) || toDateKey(new Date());
+        const [year, month, date] = normalized.split("-").map(Number);
+        return new Date(year, month - 1, date);
+      }
+
+      function normalizeDateKey(value) {
+        if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          return "";
+        }
+        return value;
+      }
+
+      function toDateKey(date) {
+        return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+      }
+
+      function shortDate(dateKey) {
+        const date = parseDateKey(dateKey);
+        return `${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+      }
+
+      function formatMonthDay(dateKey) {
+        const date = parseDateKey(dateKey);
+        return `${date.getMonth() + 1}月${date.getDate()}日`;
+      }
+
+      function formatDateCn(dateKey) {
+        const date = parseDateKey(dateKey);
+        return `${date.getFullYear()}年${pad2(date.getMonth() + 1)}月${pad2(date.getDate())}日`;
+      }
+
+      function formatDateTime(date) {
+        return `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+      }
+
+      function getWeekdayName(date) {
+        return ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][date.getDay()];
+      }
+
+      function getWeekdayNameFull(date) {
+        return ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"][date.getDay()];
+      }
+
+      function pad2(number) {
+        return String(number).padStart(2, "0");
+      }
+
+      function isInRange(dateKey, startKey, endKey) {
+        return dateKey >= startKey && dateKey <= endKey;
+      }
+
+      function isSameMonth(dateKey, referenceKey) {
+        return dateKey.slice(0, 7) === referenceKey.slice(0, 7);
+      }
+
+      function sumExpenses(items) {
+        return roundMoney(items.reduce((total, item) => total + Number(item.amount || 0), 0));
+      }
+
+      function groupExpenseByType(items) {
+        return items.reduce((groups, item) => {
+          groups[item.type] = roundMoney((groups[item.type] || 0) + Number(item.amount || 0));
+          return groups;
+        }, {});
+      }
+
+      function groupExpensesByDate(items) {
+        return items.reduce((groups, item) => {
+          if (!groups[item.date]) groups[item.date] = [];
+          groups[item.date].push(item);
+          return groups;
+        }, {});
+      }
+
+      function compactExpenseLines(items, limit) {
+        if (!items.length || limit <= 0) {
+          return [];
+        }
+        if (items.length <= limit) {
+          return items;
+        }
+        const lines = items.slice(0, Math.max(0, limit - 1));
+        lines.push(combineExpenseLine(items.slice(limit - 1)));
+        return lines;
+      }
+
+      function combineExpenseLine(items) {
+        const type = [...new Set(items.map((item) => item.type).filter(Boolean))].join("/");
+        const note = items
+          .map((item) => item.note || "")
+          .filter(Boolean)
+          .join("；");
+        return {
+          type,
+          amount: sumExpenses(items),
+          note
+        };
+      }
+
+      function roundMoney(value) {
+        return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+      }
+
+      function formatMoney(value) {
+        return `￥${roundMoney(value).toFixed(2)}`;
+      }
+
+      function formatCompactMoney(value) {
+        return `￥${formatGeneralMoney(value)}`;
+      }
+
+      function formatGeneralMoney(value) {
+        const rounded = roundMoney(value);
+        if (Number.isInteger(rounded)) {
+          return String(rounded);
+        }
+        return rounded.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+      }
+
+      function countChineseAware(text) {
+        const compact = text.replace(/\s+/g, "");
+        return Array.from(compact).length;
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function escapeXml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&apos;");
+      }
+
+      function createId() {
+        if (window.crypto && crypto.randomUUID) {
+          return crypto.randomUUID();
+        }
+        return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+
+      function cleanFileName(name) {
+        const cleaned = String(name || "")
+          .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!cleaned) return "";
+        return cleaned.toLowerCase().endsWith(".html") ? cleaned : `${cleaned}.html`;
+      }
+
+      function normalizeReportFileName(name) {
+        const cleaned = String(name || "").trim();
+        if (!cleaned || cleaned === "周报.xls" || /^weekly-report(?:-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2})?\.(?:html?|xlsx?)$/i.test(cleaned)) {
+          return "周报.xlsx";
+        }
+        return cleanExcelFileName(cleaned) || "周报.xlsx";
+      }
+
+      function cleanExcelFileName(name) {
+        const cleaned = String(name || "")
+          .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+          .replace(/\s+/g, " ")
+          .trim()
+          .replace(/\.(html?|xlsx?)$/i, "");
+        if (!cleaned) return "";
+        return `${cleaned}.xlsx`;
+      }
+
+      function suggestedReportName() {
+        return "周报.xlsx";
+      }
+    })();
+  </script>
+</body>
+</html>
