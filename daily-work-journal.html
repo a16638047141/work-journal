@@ -624,11 +624,12 @@
           <strong id="monthTotal">￥0.00</strong>
         </div>
         <div class="metric">
-          <span>云端同步</span>
+          <span>云端同步 (Gist)</span>
           <div class="actions" style="margin-top:4px;gap:4px">
-            <button type="button" id="cloudEnable" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px;color:#4fd1bd">启用</button>
+            <button type="button" id="cloudNew" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px;color:#4fd1bd">新建</button>
+            <button type="button" id="cloudConnect" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px">连接</button>
             <button type="button" id="cloudSync" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px;display:none">同步</button>
-            <button type="button" id="cloudCopy" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px;display:none">复制链接</button>
+            <button type="button" id="cloudCopy" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px;display:none">复制ID</button>
           </div>
           <small id="cloudStatus" style="font-size:10px;color:#aeb4b7;display:block;margin-top:2px">未连接</small>
         </div>
@@ -955,7 +956,8 @@
           "exportData",
           "importData",
           "importFile",
-          "cloudEnable",
+          "cloudNew",
+          "cloudConnect",
           "cloudSync",
           "cloudCopy",
           "cloudStatus"
@@ -1126,7 +1128,8 @@
         els.downloadReport.addEventListener("click", downloadReport);
         els.printReport.addEventListener("click", printReport);
 
-        els.cloudEnable.addEventListener("click", cloudEnable);
+        els.cloudNew.addEventListener("click", cloudEnable);
+        els.cloudConnect.addEventListener("click", cloudConnect);
         els.cloudSync.addEventListener("click", cloudSync);
         els.cloudCopy.addEventListener("click", cloudCopyUrl);
         els.exportData.addEventListener("click", exportAllData);
@@ -2288,15 +2291,16 @@ ${content}
       function setGistToken(t) { localStorage.setItem("gist-token", t); }
       function updateCloudUI() {
         const url = getCloudUrl();
-        if (url) {
-          els.cloudEnable.style.display = "none";
+        if (getGistId() && getGistToken()) {
+          els.cloudNew.style.display = "none";
+          els.cloudConnect.style.display = "none";
           els.cloudSync.style.display = "inline-block";
           els.cloudCopy.style.display = "inline-block";
           els.cloudStatus.textContent = "已连接 · 自动同步";
           els.cloudStatus.style.color = "#4fd1bd";
         } else {
-          els.cloudEnable.style.display = "inline-block";
-          els.cloudEnable.textContent = "启用";
+          els.cloudNew.style.display = "inline-block";
+          els.cloudConnect.style.display = "inline-block";
           els.cloudSync.style.display = "none";
           els.cloudCopy.style.display = "none";
           els.cloudStatus.textContent = "未连接";
