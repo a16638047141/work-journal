@@ -2288,7 +2288,7 @@ ${content}
       function getGistId() { return localStorage.getItem("gist-id"); }
       function setGistId(id) { localStorage.setItem("gist-id", id); }
       function getGistToken() { return localStorage.getItem("gist-token"); }
-      function setGistToken(t) { localStorage.setItem("gist-token", t); }
+      function setGistToken(t) { try { localStorage.setItem("gist-token", t); } catch(e) { toast("无法保存 Token，请检查浏览器存储空间"); } }
       function updateCloudUI() {
         const url = getCloudUrl();
         if (getGistId() && getGistToken()) {
@@ -2296,7 +2296,7 @@ ${content}
           els.cloudConnect.style.display = "none";
           els.cloudSync.style.display = "inline-block";
           els.cloudCopy.style.display = "inline-block";
-          els.cloudStatus.textContent = "已连接 · 自动同步";
+          els.cloudStatus.textContent = "已连接 (ID:" + getGistId().substring(0,12) + "...)";
           els.cloudStatus.style.color = "#4fd1bd";
         } else {
           els.cloudNew.style.display = "inline-block";
