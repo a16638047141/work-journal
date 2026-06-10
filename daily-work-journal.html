@@ -2302,17 +2302,18 @@ ${content}
       async function cloudEnable() {
         saveCurrentJournal();
         try {
-          const resp = await fetch("https://jsonblob.com/api/jsonBlob", {
+          const resp = await fetch("https://api.npoint.io", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(state)
           });
-          const blobId = resp.headers.get("Location").split("/").pop();
-          setCloudUrl(blobId);
+          const data = await resp.json();
+          const id = data.id || data.url;
+          setCloudUrl(id);
           updateCloudUI();
-          toast("云端同步已启用！在其他设备上选择'导入云端数据'，输入此同步码: " + blobId.substring(0, 12) + "...");
+          toast("云端已启用！同步码: " + id.substring(0, 16) + "... 发到另一台设备粘贴");
         } catch (e) {
-          toast("连接云服务失败，请检查网络");
+          toast("连接失败，重试一次");
         }
       }
 
@@ -2321,20 +2322,20 @@ ${content}
         if (!url) return;
         saveCurrentJournal();
         try {
-          await fetch("https://jsonblob.com/api/jsonBlob/" + url, {
+          await fetch("https://api.npoint.io/" + url, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(state)
           });
-          toast("已同步到云端");
+          toast("已同步");
         } catch (e) {
-          toast("同步失败，请检查网络");
+          toast("同步失败");
         }
       }
 
       async function cloudLoad(url) {
         try {
-          const resp = await fetch("https://jsonblob.com/api/jsonBlob/" + url);
+          const resp = await fetch("https://api.npoint.io/" + url);
           const data = await resp.json();
           setCloudUrl(url);
           Object.assign(state, data);
@@ -2344,7 +2345,7 @@ ${content}
           updateCloudUI();
           toast("云端数据已加载");
         } catch (e) {
-          toast("加载失败，请检查同步码是否正确");
+          toast("加载失败，检查同步码");
         }
       }
 
