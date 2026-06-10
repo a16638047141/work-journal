@@ -624,12 +624,13 @@
           <strong id="monthTotal">￥0.00</strong>
         </div>
         <div class="metric">
-          <span>数据同步</span>
+          <span>云端同步</span>
           <div class="actions" style="margin-top:4px;gap:4px">
-            <button type="button" id="exportData" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px">导出</button>
-            <button type="button" id="importData" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px">导入</button>
+            <button type="button" id="cloudEnable" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px;color:#4fd1bd">启用</button>
+            <button type="button" id="cloudSync" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px;display:none">同步</button>
+            <button type="button" id="cloudCopy" class="ghost" style="font-size:11px;min-height:26px;padding:0 8px;display:none">复制链接</button>
           </div>
-          <input type="file" id="importFile" accept=".json" style="display:none">
+          <small id="cloudStatus" style="font-size:10px;color:#aeb4b7;display:block;margin-top:2px">未连接</small>
         </div>
       </div>
     </header>
@@ -900,9 +901,14 @@
         hydrateControls();
         bindEvents();
         renderAll();
+        updateCloudUI();
+        if (getCloudUrl()) {
+          cloudLoad(getCloudUrl());
+        }
         setInterval(() => {
           saveCurrentJournal();
           persist("自动保存");
+          if (getCloudUrl()) cloudSync();
         }, 30000);
       }
 
@@ -948,7 +954,11 @@
           "toast",
           "exportData",
           "importData",
-          "importFile"
+          "importFile",
+          "cloudEnable",
+          "cloudSync",
+          "cloudCopy",
+          "cloudStatus"
         ].forEach((id) => {
           els[id] = document.getElementById(id);
         });
@@ -1116,6 +1126,9 @@
         els.downloadReport.addEventListener("click", downloadReport);
         els.printReport.addEventListener("click", printReport);
 
+        els.cloudEnable.addEventListener("click", cloudEnable);
+        els.cloudSync.addEventListener("click", cloudSync);
+        els.cloudCopy.addEventListener("click", cloudCopyUrl);
         els.exportData.addEventListener("click", exportAllData);
         els.importData.addEventListener("click", () => els.importFile.click());
         els.importFile.addEventListener("change", importAllData);
@@ -2262,6 +2275,84 @@ ${content}
           return { ...createDefaultState(), ...JSON.parse(raw) };
         } catch (error) {
           return createDefaultState();
+        }
+      }
+
+      const CLOUD_KEY = "cloud-sync-url";
+
+      function getCloudUrl() { return localStorage.getItem(CLOUD_KEY); }
+      function setCloudUrl(url) { localStorage.setItem(CLOUD_KEY, url); }
+      function updateCloudUI() {
+        const url = getCloudUrl();
+        if (url) {
+          els.cloudEnable.style.display = "none";
+          els.cloudSync.style.display = "inline-block";
+          els.cloudCopy.style.display = "inline-block";
+          els.cloudStatus.textContent = "已连接 · 自动同步";
+          els.cloudStatus.style.color = "#4fd1bd";
+        } else {
+          els.cloudEnable.style.display = "inline-block";
+          els.cloudSync.style.display = "none";
+          els.cloudCopy.style.display = "none";
+          els.cloudStatus.textContent = "未连接";
+          els.cloudStatus.style.color = "#aeb4b7";
+        }
+      }
+
+      async function cloudEnable() {
+        saveCurrentJournal();
+        try {
+          const resp = await fetch("https://jsonblob.com/api/jsonBlob", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(state)
+          });
+          const blobId = resp.headers.get("Location").split("/").pop();
+          setCloudUrl(blobId);
+          updateCloudUI();
+          toast("云端同步已启用！在其他设备上选择'导入云端数据'，输入此同步码: " + blobId.substring(0, 12) + "...");
+        } catch (e) {
+          toast("连接云服务失败，请检查网络");
+        }
+      }
+
+      async function cloudSync() {
+        const url = getCloudUrl();
+        if (!url) return;
+        saveCurrentJournal();
+        try {
+          await fetch("https://jsonblob.com/api/jsonBlob/" + url, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(state)
+          });
+          toast("已同步到云端");
+        } catch (e) {
+          toast("同步失败，请检查网络");
+        }
+      }
+
+      async function cloudLoad(url) {
+        try {
+          const resp = await fetch("https://jsonblob.com/api/jsonBlob/" + url);
+          const data = await resp.json();
+          setCloudUrl(url);
+          Object.assign(state, data);
+          saveToStorage();
+          hydrateControls();
+          renderAll();
+          updateCloudUI();
+          toast("云端数据已加载");
+        } catch (e) {
+          toast("加载失败，请检查同步码是否正确");
+        }
+      }
+
+      function cloudCopyUrl() {
+        const url = getCloudUrl();
+        if (url) {
+          navigator.clipboard.writeText(url).then(() => toast("同步码已复制，发送到另一台设备"))
+            .catch(() => toast("复制失败: " + url));
         }
       }
 
