@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>工作日报与周报生成器</title>
+  <title>数物工作周报</title>
   <style>
     :root {
       color-scheme: dark;
@@ -668,7 +668,7 @@
   <div class="app">
     <header class="topbar">
       <div class="title-block">
-        <h1>工作日报与周报生成器</h1>
+        <h1>数物工作周报</h1>
         <p class="save-state" id="saveState">准备就绪</p>
       </div>
       <div class="metrics" aria-label="统计">
@@ -848,7 +848,7 @@
       const STORE_KEY = "daily-work-journal.v1";
       const TEMPLATE_VERSION = 3;
       const LEGACY_DEFAULT_TEMPLATE = `<section class="weekly-report">
-  <h1>工作周报</h1>
+  <h1>数物工作周报</h1>
   <p class="date-range">{{DATE_RANGE}}</p>
 
   <h2>本周工作内容</h2>
@@ -859,7 +859,7 @@
   <p class="total-line">本周费用合计：{{TOTAL_EXPENSE}}</p>
 </section>`;
       const DEFAULT_TEMPLATE = `<div class="excel-report xls-weekly-template" data-date-range="{{DATE_RANGE}}" data-total="{{TOTAL_EXPENSE_NUMBER}}">
-  <table class="weekly-xls-table" aria-label="工作周报">
+  <table class="weekly-xls-table" aria-label="数物工作周报">
     <colgroup>
       <col class="col-a">
       <col class="col-b">
@@ -1866,7 +1866,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>工作周报</title>
+  <title>数物工作周报</title>
   <style>
     @page {
       size: A4 portrait;
@@ -2167,9 +2167,9 @@ ${content}
             name: "docProps/core.xml",
             content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>工作周报</dc:title>
-  <dc:creator>工作周报生成器</dc:creator>
-  <cp:lastModifiedBy>工作周报生成器</cp:lastModifiedBy>
+  <dc:title>数物工作周报</dc:title>
+  <dc:creator>数物工作周报</dc:creator>
+  <cp:lastModifiedBy>数物工作周报</cp:lastModifiedBy>
   <dcterms:created xsi:type="dcterms:W3CDTF">${created}</dcterms:created>
   <dcterms:modified xsi:type="dcterms:W3CDTF">${created}</dcterms:modified>
 </cp:coreProperties>`
