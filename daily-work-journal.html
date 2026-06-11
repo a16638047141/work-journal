@@ -1120,8 +1120,7 @@
         els.expenseDate.addEventListener("change", () => {
           const dateKey = normalizeDateKey(els.expenseDate.value) || toDateKey(new Date());
           els.expenseDate.value = dateKey;
-          state.reportDate = dateKey;
-          els.reportDate.value = dateKey;
+          setReportContextDate(dateKey);
           renderStats();
           renderExpenses();
           renderReportRange();
@@ -1166,12 +1165,11 @@
         });
 
         els.reportDate.addEventListener("change", () => {
-          state.reportDate = normalizeDateKey(els.reportDate.value) || toDateKey(new Date());
-          els.reportDate.value = state.reportDate;
-          els.expenseDate.value = state.reportDate;
+          setReportContextDate(els.reportDate.value);
           renderStats();
           renderExpenses();
           renderReportRange();
+          renderMonthlyReportPreview();
           queuePersist();
         });
 
@@ -1253,8 +1251,7 @@
           note: ""
         });
 
-        state.reportDate = date;
-        els.reportDate.value = date;
+        setReportContextDate(date);
         state.expenses.sort((a, b) => a.date.localeCompare(b.date) || a.type.localeCompare(b.type));
         els.expenseAmount.value = "";
         els.expenseNote.value = "";
@@ -1560,11 +1557,7 @@
           });
         });
         state.expenses.sort((a, b) => a.date.localeCompare(b.date) || a.type.localeCompare(b.type));
-        state.reportDate = rows.toImport[0].date;
-        els.reportDate.value = state.reportDate;
-        els.expenseDate.value = state.reportDate;
-        state.expenseView = "month";
-        updateExpenseViewButtons();
+        setReportContextDate(rows.toImport[0].date, { expenseView: "month" });
         pendingTripRows = [];
         renderTripImportRows();
         renderAll();
@@ -1628,10 +1621,11 @@
       }
 
       function renderStats() {
-        const bounds = getWorkWeekBounds(parseDateKey(state.reportDate));
+        const reportDateKey = getActiveReportDateKey();
+        const bounds = getWorkWeekBounds(parseDateKey(reportDateKey));
         const weekItems = state.expenses.filter((item) => isInRange(item.date, bounds.startKey, bounds.endKey));
-        const monthItems = state.expenses.filter((item) => isSameMonth(item.date, state.reportDate));
-        const writtenDays = getWorkdays(state.reportDate).filter((dateKey) => hasJournalEntry(dateKey));
+        const monthItems = state.expenses.filter((item) => isSameMonth(item.date, reportDateKey));
+        const writtenDays = getWorkdays(reportDateKey).filter((dateKey) => hasJournalEntry(dateKey));
         els.weekTotal.textContent = formatMoney(sumExpenses(weekItems));
         els.monthTotal.textContent = formatMoney(sumExpenses(monthItems));
         if (els.journalDays) {
@@ -1707,13 +1701,11 @@
           button.addEventListener("click", () => {
             const dateKey = button.dataset.expenseDay;
             els.expenseDate.value = dateKey;
-            state.reportDate = dateKey;
-            els.reportDate.value = dateKey;
-            state.expenseView = "week";
-            updateExpenseViewButtons();
+            setReportContextDate(dateKey, { expenseView: "week" });
             renderStats();
             renderExpenses();
             renderReportRange();
+            renderMonthlyReportPreview();
             queuePersist();
           });
         });
@@ -1762,13 +1754,13 @@
       }
 
       function renderReportRange() {
-        const bounds = getWorkWeekBounds(parseDateKey(state.reportDate));
+        const bounds = getWorkWeekBounds(parseDateKey(getActiveReportDateKey()));
         els.reportRange.textContent = `${shortDate(bounds.startKey)} 至 ${shortDate(bounds.endKey)}`;
       }
 
       function renderMonthlyReportPreview() {
         if (!els.monthlyReportPreview) return;
-        const dateKey = normalizeDateKey(state.reportDate) || toDateKey(new Date());
+        const dateKey = getActiveReportDateKey();
         const sheets = buildMonthlySheetDefinitions(dateKey);
         const monthItems = state.expenses.filter((item) => isSameMonth(item.date, dateKey));
         const sheetNames = sheets.map((sheet) => `<strong>${escapeHtml(sheet.name)}</strong>`).join("、");
@@ -1782,10 +1774,10 @@
       function generateAndRenderReport() {
         saveCurrentJournal();
         state.template = els.templateText.value || DEFAULT_TEMPLATE;
-        state.reportDate = normalizeDateKey(els.reportDate.value) || toDateKey(new Date());
+        const reportDateKey = setReportContextDate(getActiveReportDateKey());
         state.reportFileName = normalizeReportFileName(els.reportFileName.value || suggestedReportName());
         els.reportFileName.value = state.reportFileName;
-        const report = buildReportHtml(fillTemplate(state.template, state.reportDate));
+        const report = buildReportHtml(fillTemplate(state.template, reportDateKey));
         state.generatedReport = report;
         els.reportSource.value = report;
         els.reportPreview.srcdoc = report;
@@ -2683,17 +2675,17 @@ ${workbookRelationships}
         try {
           saveCurrentJournal();
           state.template = els.templateText.value || DEFAULT_TEMPLATE;
-          state.reportDate = normalizeDateKey(els.reportDate.value) || toDateKey(new Date());
-          els.reportDate.value = state.reportDate;
-          const blob = buildMonthlyXlsxBlob(state.reportDate);
+          const reportDateKey = setReportContextDate(getActiveReportDateKey());
+          const blob = buildMonthlyXlsxBlob(reportDateKey);
           const url = URL.createObjectURL(blob);
           const link = document.createElement("a");
           link.href = url;
-          link.download = suggestedMonthlyReportName(state.reportDate);
+          link.download = suggestedMonthlyReportName(reportDateKey);
           document.body.appendChild(link);
           link.click();
           link.remove();
           URL.revokeObjectURL(url);
+          renderMonthlyReportPreview();
           persist("已保存");
           toast("月报已下载");
         } catch (error) {
@@ -2710,26 +2702,28 @@ ${workbookRelationships}
       }
 
       function getVisibleExpenses() {
+        const reportDateKey = getActiveReportDateKey();
         const view = state.expenseView || "week";
         if (view === "all") {
           return state.expenses.slice();
         }
         if (view === "month") {
-          return state.expenses.filter((item) => isSameMonth(item.date, state.reportDate));
+          return state.expenses.filter((item) => isSameMonth(item.date, reportDateKey));
         }
-        const bounds = getWorkWeekBounds(parseDateKey(state.reportDate));
+        const bounds = getWorkWeekBounds(parseDateKey(reportDateKey));
         return state.expenses.filter((item) => isInRange(item.date, bounds.startKey, bounds.endKey));
       }
 
       function getExpenseRangeLabel() {
+        const reportDateKey = getActiveReportDateKey();
         if (state.expenseView === "all") {
           return "全部";
         }
         if (state.expenseView === "month") {
-          const date = parseDateKey(state.reportDate);
+          const date = parseDateKey(reportDateKey);
           return `${date.getFullYear()}年${pad2(date.getMonth() + 1)}月`;
         }
-        const bounds = getWorkWeekBounds(parseDateKey(state.reportDate));
+        const bounds = getWorkWeekBounds(parseDateKey(reportDateKey));
         return `${shortDate(bounds.startKey)} 至 ${shortDate(bounds.endKey)}`;
       }
 
@@ -2747,11 +2741,28 @@ ${workbookRelationships}
 
       function syncWeekContext(dateKey) {
         const normalized = normalizeDateKey(dateKey) || toDateKey(new Date());
+        setReportContextDate(normalized, { expenseView: "week" });
+        renderMonthlyReportPreview();
+      }
+
+      function getActiveReportDateKey() {
+        return normalizeDateKey(els.reportDate && els.reportDate.value)
+          || normalizeDateKey(state.reportDate)
+          || normalizeDateKey(els.journalDate && els.journalDate.value)
+          || normalizeDateKey(state.selectedDate)
+          || toDateKey(new Date());
+      }
+
+      function setReportContextDate(dateKey, options = {}) {
+        const normalized = normalizeDateKey(dateKey) || getActiveReportDateKey();
         state.reportDate = normalized;
-        els.reportDate.value = normalized;
-        els.expenseDate.value = normalized;
-        state.expenseView = "week";
-        updateExpenseViewButtons();
+        if (els.reportDate) els.reportDate.value = normalized;
+        if (els.expenseDate) els.expenseDate.value = normalized;
+        if (options.expenseView) {
+          state.expenseView = options.expenseView;
+          updateExpenseViewButtons();
+        }
+        return normalized;
       }
 
       function setJournalEntry(dateKey, text) {
