@@ -823,6 +823,7 @@
             <span class="journal-meta source-hidden" id="reportMeta">未生成</span>
             <button type="button" id="copyReport" class="source-hidden" title="复制生成后的 HTML" aria-hidden="true" tabindex="-1">复制HTML</button>
             <button type="button" id="downloadReport" class="primary" title="下载 Excel 可打开的周报">下载周报</button>
+            <button type="button" id="downloadMonthlyReport" title="按本月每周生成多个 Sheet">下载月报</button>
             <button type="button" id="printReport" title="打印生成后的周报">打印周报</button>
           </div>
 
@@ -1020,6 +1021,7 @@
           "reportMeta",
           "copyReport",
           "downloadReport",
+          "downloadMonthlyReport",
           "printReport",
           "reportSource",
           "reportPreview",
@@ -1205,6 +1207,7 @@
 
         els.copyReport.addEventListener("click", copyReport);
         els.downloadReport.addEventListener("click", downloadReport);
+        els.downloadMonthlyReport.addEventListener("click", downloadMonthlyReport);
         els.printReport.addEventListener("click", printReport);
 
         onOptional("cloudNew", "click", cloudEnable);
@@ -2131,16 +2134,35 @@ ${content}
       }
 
       function buildXlsxBlob(reportDateKey) {
-        const files = buildXlsxFiles(reportDateKey);
+        const files = buildXlsxFiles([{ name: "周报", reportDateKey }]);
         return new Blob([zipFiles(files)], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         });
       }
 
-      function buildXlsxFiles(reportDateKey) {
-        const sheetXml = buildWorksheetXml(reportDateKey);
+      function buildMonthlyXlsxBlob(reportDateKey) {
+        const files = buildXlsxFiles(buildMonthlySheetDefinitions(reportDateKey));
+        return new Blob([zipFiles(files)], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        });
+      }
+
+      function buildXlsxFiles(sheetDefinitions) {
+        const sheets = uniqueSheetNames(sheetDefinitions);
+        const worksheetOverrides = sheets
+          .map((sheet, index) => `  <Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`)
+          .join("\n");
+        const workbookSheets = sheets
+          .map((sheet, index) => `    <sheet name="${escapeXml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`)
+          .join("\n");
+        const workbookRelationships = sheets
+          .map((sheet, index) => `  <Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`)
+          .join("\n");
+        const titlesOfParts = sheets
+          .map((sheet) => `<vt:lpstr>${escapeXml(sheet.name)}</vt:lpstr>`)
+          .join("");
         const created = new Date().toISOString();
-        return [
+        const files = [
           {
             name: "[Content_Types].xml",
             content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -2150,7 +2172,7 @@ ${content}
   <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
   <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+${worksheetOverrides}
   <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
 </Types>`
           },
@@ -2181,8 +2203,8 @@ ${content}
   <Application>Microsoft Excel</Application>
   <DocSecurity>0</DocSecurity>
   <ScaleCrop>false</ScaleCrop>
-  <HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>工作表</vt:lpstr></vt:variant><vt:variant><vt:i4>1</vt:i4></vt:variant></vt:vector></HeadingPairs>
-  <TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>周报</vt:lpstr></vt:vector></TitlesOfParts>
+  <HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>工作表</vt:lpstr></vt:variant><vt:variant><vt:i4>${sheets.length}</vt:i4></vt:variant></vt:vector></HeadingPairs>
+  <TitlesOfParts><vt:vector size="${sheets.length}" baseType="lpstr">${titlesOfParts}</vt:vector></TitlesOfParts>
 </Properties>`
           },
           {
@@ -2192,7 +2214,7 @@ ${content}
   <fileVersion appName="xl" lastEdited="7" lowestEdited="7" rupBuild="23426"/>
   <workbookPr defaultThemeVersion="166925"/>
   <sheets>
-    <sheet name="周报" sheetId="1" r:id="rId1"/>
+${workbookSheets}
   </sheets>
   <calcPr calcId="191029"/>
 </workbook>`
@@ -2201,23 +2223,26 @@ ${content}
             name: "xl/_rels/workbook.xml.rels",
             content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+${workbookRelationships}
+  <Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>`
           },
           {
             name: "xl/styles.xml",
             content: buildXlsxStylesXml()
-          },
-          {
-            name: "xl/worksheets/sheet1.xml",
-            content: sheetXml
           }
         ];
+        sheets.forEach((sheet, index) => {
+          files.push({
+            name: `xl/worksheets/sheet${index + 1}.xml`,
+            content: buildWorksheetXml(sheet.reportDateKey, sheet.options || {})
+          });
+        });
+        return files;
       }
 
-      function buildWorksheetXml(reportDateKey) {
-        const data = buildWorksheetData(reportDateKey);
+      function buildWorksheetXml(reportDateKey, options = {}) {
+        const data = buildWorksheetData(reportDateKey, options);
         const colsXml = [
           [1, 1, 4.63],
           [2, 2, 3],
@@ -2262,7 +2287,7 @@ ${content}
 </worksheet>`;
       }
 
-      function buildWorksheetData(reportDateKey) {
+      function buildWorksheetData(reportDateKey, options = {}) {
         const rows = Array.from({ length: 26 }, () => Array.from({ length: 16 }, () => ({ value: "", style: 1 })));
         const set = (row, col, value, style = 1) => {
           rows[row - 1][col - 1] = { value, style };
@@ -2302,8 +2327,10 @@ ${content}
         set(5, 16, "备注");
 
         const bounds = getWorkWeekBounds(parseDateKey(reportDateKey));
+        const monthKey = options.monthKey || "";
         const weekExpenses = state.expenses
           .filter((item) => isInRange(item.date, bounds.startKey, bounds.endKey))
+          .filter((item) => !monthKey || item.date.slice(0, 7) === monthKey)
           .sort((a, b) => a.date.localeCompare(b.date) || a.type.localeCompare(b.type));
         const expensesByDate = groupExpensesByDate(weekExpenses);
         const total = sumExpenses(weekExpenses);
@@ -2311,10 +2338,13 @@ ${content}
           const topRow = 6 + index * 2;
           const bottomRow = topRow + 1;
           const lineLimit = index === 6 ? 1 : 2;
-          const expenseLines = compactExpenseLines(expensesByDate[dateKey] || [], lineLimit);
+          const isMonthDay = !monthKey || dateKey.slice(0, 7) === monthKey;
+          const expenseLines = isMonthDay ? compactExpenseLines(expensesByDate[dateKey] || [], lineLimit) : [];
           set(topRow, 1, getWeekdayNameFull(parseDateKey(dateKey)));
-          set(topRow, 3, formatMonthDay(dateKey));
-          set(topRow, 4, String(state.journals[dateKey] || "").trim());
+          if (isMonthDay) {
+            set(topRow, 3, formatMonthDay(dateKey));
+            set(topRow, 4, String(state.journals[dateKey] || "").trim());
+          }
           applyExpenseToRow(rows, topRow, expenseLines[0]);
           if (index === 6) {
             set(bottomRow, 7, total);
@@ -2551,6 +2581,24 @@ ${content}
         win.document.close();
         win.focus();
         setTimeout(() => win.print(), 250);
+      }
+
+      function downloadMonthlyReport() {
+        saveCurrentJournal();
+        state.template = els.templateText.value || DEFAULT_TEMPLATE;
+        state.reportDate = normalizeDateKey(els.reportDate.value) || toDateKey(new Date());
+        els.reportDate.value = state.reportDate;
+        const blob = buildMonthlyXlsxBlob(state.reportDate);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = suggestedMonthlyReportName(state.reportDate);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        persist("已保存");
+        toast("月报已下载");
       }
 
       function ensureReport() {
@@ -2897,6 +2945,55 @@ ${content}
         return Array.from({ length: 7 }, (_, index) => toDateKey(addDays(start, index)));
       }
 
+      function buildMonthlySheetDefinitions(referenceKey) {
+        const referenceDate = parseDateKey(referenceKey);
+        const year = referenceDate.getFullYear();
+        const month = referenceDate.getMonth();
+        const monthStart = new Date(year, month, 1);
+        const monthEnd = new Date(year, month + 1, 0);
+        const monthKey = `${year}-${pad2(month + 1)}`;
+        const monthName = getChineseMonthName(month);
+        const sheets = [];
+        let cursor = getMonday(monthStart);
+        let weekIndex = 1;
+        while (cursor <= monthEnd) {
+          const weekEnd = addDays(cursor, 6);
+          const reportDate = cursor < monthStart ? monthStart : cursor;
+          sheets.push({
+            name: `${monthName}${getChineseOrdinal(weekIndex)}周`,
+            reportDateKey: toDateKey(reportDate),
+            options: { monthKey }
+          });
+          cursor = addDays(cursor, 7);
+          weekIndex += 1;
+        }
+        return sheets;
+      }
+
+      function uniqueSheetNames(sheetDefinitions) {
+        const used = new Set();
+        return sheetDefinitions.map((sheet, index) => {
+          const base = normalizeSheetName(sheet.name || `Sheet${index + 1}`);
+          let candidate = base;
+          let suffix = 2;
+          while (used.has(candidate)) {
+            const marker = `(${suffix})`;
+            candidate = `${base.slice(0, 31 - marker.length)}${marker}`;
+            suffix += 1;
+          }
+          used.add(candidate);
+          return { ...sheet, name: candidate };
+        });
+      }
+
+      function normalizeSheetName(name) {
+        const cleaned = String(name || "")
+          .replace(/[\[\]:*?/\\]/g, "-")
+          .replace(/^'+|'+$/g, "")
+          .trim();
+        return (cleaned || "Sheet").slice(0, 31);
+      }
+
       function getWorkWeekBounds(date) {
         const start = getMonday(date);
         const end = addDays(start, 6);
@@ -2964,6 +3061,14 @@ ${content}
 
       function getWeekdayNameFull(date) {
         return ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"][date.getDay()];
+      }
+
+      function getChineseMonthName(monthIndex) {
+        return ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"][monthIndex];
+      }
+
+      function getChineseOrdinal(number) {
+        return ["", "第一", "第二", "第三", "第四", "第五", "第六"][number] || `第${number}`;
       }
 
       function pad2(number) {
@@ -3101,6 +3206,11 @@ ${content}
 
       function suggestedReportName() {
         return "周报.xlsx";
+      }
+
+      function suggestedMonthlyReportName(dateKey) {
+        const date = parseDateKey(dateKey);
+        return `${date.getFullYear()}年${pad2(date.getMonth() + 1)}月月报.xlsx`;
       }
     })();
   </script>
