@@ -826,6 +826,7 @@
             <button type="button" id="downloadMonthlyReport" title="按本月每周生成多个 Sheet">下载月报</button>
             <button type="button" id="printReport" title="打印生成后的周报">打印周报</button>
           </div>
+          <div class="summary-line" id="monthlyReportPreview"></div>
 
           <details class="output-panel" id="outputPanel">
             <summary>可选：查看导出预览</summary>
@@ -1023,6 +1024,7 @@
           "downloadReport",
           "downloadMonthlyReport",
           "printReport",
+          "monthlyReportPreview",
           "reportSource",
           "reportPreview",
           "toast",
@@ -1123,6 +1125,7 @@
           renderStats();
           renderExpenses();
           renderReportRange();
+          renderMonthlyReportPreview();
           queuePersist();
         });
 
@@ -1411,7 +1414,7 @@
           toast("请先粘贴或上传行程明细");
           return;
         }
-        pendingTripRows = parseTripRows(text);
+        pendingTripRows = markTripDuplicateRows(parseTripRows(text));
         renderTripImportRows();
         toast(pendingTripRows.length ? `识别到 ${pendingTripRows.length} 条行程` : "没有识别到行程，请检查文本格式");
       }
@@ -1510,6 +1513,7 @@
           <td><input type="checkbox" data-trip-field="selected" ${row.selected ? "checked" : ""} title="导入这条"></td>
           <td><input type="date" data-trip-field="date" value="${escapeHtml(row.date)}"></td>
           <td><input type="number" min="0.01" step="0.01" data-trip-field="amount" value="${escapeHtml(formatGeneralMoney(row.amount))}"></td>
+          <td>${row.duplicate ? '<span class="type-badge">已存在</span>' : ""}</td>
         </tr>`).join("");
         els.tripImportResult.innerHTML = `<div class="table-wrap">
           <table>
@@ -1518,6 +1522,7 @@
                 <th>导入</th>
                 <th>日期</th>
                 <th class="amount">金额</th>
+                <th>状态</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -1532,19 +1537,20 @@
             return {
               selected: Boolean(get("selected") && get("selected").checked),
               date: normalizeDateKey(get("date") ? get("date").value : ""),
+              type: "打车",
               amount: roundMoney(Number.parseFloat(get("amount") ? get("amount").value : ""))
             };
           });
       }
 
       function applyTripImportRows() {
-        const rows = readTripImportRowsFromDom()
-          .filter((row) => row.selected && row.date && Number.isFinite(row.amount) && row.amount > 0);
-        if (!rows.length) {
-          toast("没有可导入的有效行程");
+        const rows = skipExistingTripRows(readTripImportRowsFromDom()
+          .filter((row) => row.selected && row.date && Number.isFinite(row.amount) && row.amount > 0));
+        if (!rows.toImport.length) {
+          toast(rows.skipped ? `已跳过 ${rows.skipped} 条重复行程` : "没有可导入的有效行程");
           return;
         }
-        rows.forEach((row) => {
+        rows.toImport.forEach((row) => {
           state.expenses.push({
             id: createId(),
             date: row.date,
@@ -1554,7 +1560,7 @@
           });
         });
         state.expenses.sort((a, b) => a.date.localeCompare(b.date) || a.type.localeCompare(b.type));
-        state.reportDate = rows[0].date;
+        state.reportDate = rows.toImport[0].date;
         els.reportDate.value = state.reportDate;
         els.expenseDate.value = state.reportDate;
         state.expenseView = "month";
@@ -1563,7 +1569,47 @@
         renderTripImportRows();
         renderAll();
         persist("已保存");
-        toast(`已导入 ${rows.length} 条打车费用`);
+        toast(rows.skipped ? `已导入 ${rows.toImport.length} 条，跳过 ${rows.skipped} 条重复` : `已导入 ${rows.toImport.length} 条打车费用`);
+      }
+
+      function markTripDuplicateRows(rows) {
+        const counts = buildExistingTripCounts();
+        return rows.map((row) => {
+          const key = expenseImportKey(row);
+          const count = counts.get(key) || 0;
+          const duplicate = count > 0;
+          if (duplicate) counts.set(key, count - 1);
+          return { ...row, duplicate, selected: duplicate ? false : row.selected };
+        });
+      }
+
+      function skipExistingTripRows(rows) {
+        const counts = buildExistingTripCounts();
+        const toImport = [];
+        let skipped = 0;
+        rows.forEach((row) => {
+          const key = expenseImportKey(row);
+          const count = counts.get(key) || 0;
+          if (count > 0) {
+            counts.set(key, count - 1);
+            skipped += 1;
+          } else {
+            toImport.push(row);
+          }
+        });
+        return { toImport, skipped };
+      }
+
+      function buildExistingTripCounts() {
+        return state.expenses.reduce((counts, item) => {
+          const key = expenseImportKey(item);
+          counts.set(key, (counts.get(key) || 0) + 1);
+          return counts;
+        }, new Map());
+      }
+
+      function expenseImportKey(item) {
+        return `${normalizeDateKey(item.date)}|${item.type || "打车"}|${roundMoney(item.amount || 0).toFixed(2)}`;
       }
 
       function clearTripImport() {
@@ -1577,6 +1623,7 @@
         renderJournal();
         renderExpenses();
         renderReportRange();
+        renderMonthlyReportPreview();
         updateSaveState("已保存到本地");
       }
 
@@ -1717,6 +1764,19 @@
       function renderReportRange() {
         const bounds = getWorkWeekBounds(parseDateKey(state.reportDate));
         els.reportRange.textContent = `${shortDate(bounds.startKey)} 至 ${shortDate(bounds.endKey)}`;
+      }
+
+      function renderMonthlyReportPreview() {
+        if (!els.monthlyReportPreview) return;
+        const dateKey = normalizeDateKey(state.reportDate) || toDateKey(new Date());
+        const sheets = buildMonthlySheetDefinitions(dateKey);
+        const monthItems = state.expenses.filter((item) => isSameMonth(item.date, dateKey));
+        const sheetNames = sheets.map((sheet) => `<strong>${escapeHtml(sheet.name)}</strong>`).join("、");
+        els.monthlyReportPreview.innerHTML = [
+          `<span>月报 ${sheets.length} 个 Sheet</span>`,
+          `<span>${sheetNames}</span>`,
+          `<span>本月费用 <strong>${formatMoney(sumExpenses(monthItems))}</strong></span>`
+        ].join("");
       }
 
       function generateAndRenderReport() {
@@ -2134,14 +2194,18 @@ ${content}
       }
 
       function buildXlsxBlob(reportDateKey) {
-        const files = buildXlsxFiles([{ name: "周报", reportDateKey }]);
+        const sheetDefinitions = [{ name: "周报", reportDateKey }];
+        const files = buildXlsxFiles(sheetDefinitions);
+        assertXlsxFiles(files, uniqueSheetNames(sheetDefinitions).map((sheet) => sheet.name));
         return new Blob([zipFiles(files)], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         });
       }
 
       function buildMonthlyXlsxBlob(reportDateKey) {
-        const files = buildXlsxFiles(buildMonthlySheetDefinitions(reportDateKey));
+        const sheetDefinitions = buildMonthlySheetDefinitions(reportDateKey);
+        const files = buildXlsxFiles(sheetDefinitions);
+        assertXlsxFiles(files, uniqueSheetNames(sheetDefinitions).map((sheet) => sheet.name));
         return new Blob([zipFiles(files)], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         });
@@ -2239,6 +2303,33 @@ ${workbookRelationships}
           });
         });
         return files;
+      }
+
+      function assertXlsxFiles(files, expectedSheetNames) {
+        const byName = new Map(files.map((file) => [file.name, file.content]));
+        const issues = [];
+        ["[Content_Types].xml", "_rels/.rels", "docProps/core.xml", "docProps/app.xml", "xl/workbook.xml", "xl/_rels/workbook.xml.rels", "xl/styles.xml"].forEach((name) => {
+          if (!byName.has(name)) issues.push(`缺少 ${name}`);
+        });
+        const contentTypes = byName.get("[Content_Types].xml") || "";
+        const workbook = byName.get("xl/workbook.xml") || "";
+        const rels = byName.get("xl/_rels/workbook.xml.rels") || "";
+        expectedSheetNames.forEach((sheetName, index) => {
+          const sheetPath = `xl/worksheets/sheet${index + 1}.xml`;
+          if (!byName.has(sheetPath)) issues.push(`缺少 ${sheetPath}`);
+          if (!contentTypes.includes(`/xl/worksheets/sheet${index + 1}.xml`)) issues.push(`缺少 sheet${index + 1} 内容类型`);
+          if (!workbook.includes(`name="${escapeXml(sheetName)}"`)) issues.push(`缺少工作表 ${sheetName}`);
+          if (!rels.includes(`Id="rId${index + 1}"`) || !rels.includes(`Target="worksheets/sheet${index + 1}.xml"`)) {
+            issues.push(`缺少 sheet${index + 1} 关系`);
+          }
+        });
+        const worksheetCount = files.filter((file) => /^xl\/worksheets\/sheet\d+\.xml$/.test(file.name)).length;
+        if (worksheetCount !== expectedSheetNames.length) {
+          issues.push(`工作表数量应为 ${expectedSheetNames.length}，实际为 ${worksheetCount}`);
+        }
+        if (issues.length) {
+          throw new Error(`XLSX 自检失败：${issues.join("；")}`);
+        }
       }
 
       function buildWorksheetXml(reportDateKey, options = {}) {
@@ -2556,17 +2647,22 @@ ${workbookRelationships}
       }
 
       function downloadReport() {
-        generateAndRenderReport();
-        const blob = buildXlsxBlob(state.reportDate);
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = cleanExcelFileName(els.reportFileName.value) || suggestedReportName();
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-        toast("周报已下载");
+        try {
+          generateAndRenderReport();
+          const blob = buildXlsxBlob(state.reportDate);
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = cleanExcelFileName(els.reportFileName.value) || suggestedReportName();
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          toast("周报已下载");
+        } catch (error) {
+          console.error(error);
+          toast(error.message || "周报导出失败");
+        }
       }
 
       function printReport() {
@@ -2584,21 +2680,26 @@ ${workbookRelationships}
       }
 
       function downloadMonthlyReport() {
-        saveCurrentJournal();
-        state.template = els.templateText.value || DEFAULT_TEMPLATE;
-        state.reportDate = normalizeDateKey(els.reportDate.value) || toDateKey(new Date());
-        els.reportDate.value = state.reportDate;
-        const blob = buildMonthlyXlsxBlob(state.reportDate);
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = suggestedMonthlyReportName(state.reportDate);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-        persist("已保存");
-        toast("月报已下载");
+        try {
+          saveCurrentJournal();
+          state.template = els.templateText.value || DEFAULT_TEMPLATE;
+          state.reportDate = normalizeDateKey(els.reportDate.value) || toDateKey(new Date());
+          els.reportDate.value = state.reportDate;
+          const blob = buildMonthlyXlsxBlob(state.reportDate);
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = suggestedMonthlyReportName(state.reportDate);
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          persist("已保存");
+          toast("月报已下载");
+        } catch (error) {
+          console.error(error);
+          toast(error.message || "月报导出失败");
+        }
       }
 
       function ensureReport() {
