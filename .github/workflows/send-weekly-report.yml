@@ -2,8 +2,8 @@ name: Auto email weekly report
 
 on:
   schedule:
-    # Monday 16:45 in Asia/Shanghai for delivery testing. GitHub cron uses UTC.
-    - cron: "45 8 * * 1"
+    # Saturday 08:07 in Asia/Shanghai. GitHub cron uses UTC.
+    - cron: "7 0 * * 6"
   workflow_dispatch:
     inputs:
       report_date:
@@ -26,6 +26,11 @@ on:
       mail_cc:
         description: "Optional CC recipients, separated by commas"
         required: false
+        type: string
+      trigger_source:
+        description: "manual, timer, or schedule"
+        required: false
+        default: manual
         type: string
 
 jobs:
@@ -64,6 +69,7 @@ jobs:
           MAIL_CC: ${{ github.event.inputs.mail_cc || secrets.MAIL_CC }}
           MAIL_SUBJECT: ${{ secrets.MAIL_SUBJECT }}
           MAIL_TEXT: ${{ secrets.MAIL_TEXT }}
+          TRIGGER_SOURCE: ${{ github.event.inputs.trigger_source || github.event_name }}
         run: npm run send-weekly-report
 
       - name: Upload generated report

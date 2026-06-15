@@ -10,6 +10,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const htmlPath = path.join(repoRoot, "daily-work-journal.html");
 const outputDir = path.join(repoRoot, "dist");
+const GIST_DATA_FILE = "work-journal.json";
+const GIST_HISTORY_FILE = "work-journal-send-history.json";
 
 main().catch((error) => {
   console.error(error);
@@ -20,6 +22,7 @@ async function main() {
   const timeZone = process.env.TIME_ZONE || "Asia/Shanghai";
   const reportDate = normalizeDateKey(process.env.REPORT_DATE) || todayInTimeZone(timeZone);
   const dryRun = isTruthy(process.env.DRY_RUN);
+  const triggerSource = normalizeTriggerSource(process.env.TRIGGER_SOURCE || process.env.GITHUB_EVENT_NAME);
   const state = normalizeState(await loadJournalState());
   const runtime = await loadJournalRuntime(state);
 
@@ -33,24 +36,41 @@ async function main() {
   const filename = cleanAttachmentName(`${bounds.startKey}至${bounds.endKey}-周报.xlsx`);
   const blob = runtime.buildXlsxBlob(reportDate);
   const attachment = Buffer.from(await blob.arrayBuffer());
+  const sendContext = {
+    triggerSource,
+    timeZone,
+    reportDate,
+    reportRange,
+    weekStartKey: bounds.startKey,
+    weekEndKey: bounds.endKey,
+    userName,
+    filename,
+  };
 
   await fs.mkdir(outputDir, { recursive: true });
   await fs.writeFile(path.join(outputDir, filename), attachment);
   await fs.writeFile(
     path.join(outputDir, "weekly-report-summary.json"),
-    JSON.stringify({ reportDate, reportRange, userName, filename, dryRun }, null, 2),
+    JSON.stringify({ ...sendContext, dryRun }, null, 2),
   );
 
   console.log(`Generated ${filename}`);
   console.log(`Report date: ${reportDate}`);
   console.log(`Report range: ${reportRange}`);
+  console.log(`Trigger source: ${triggerSource}`);
 
   if (dryRun) {
     console.log("DRY_RUN is enabled; email was not sent.");
     return;
   }
 
-  await sendEmail({ attachment, filename, reportRange, userName });
+  if (await shouldSkipForFridayManualSend(sendContext)) {
+    console.log("Skipped: this week already has a Friday manual send record.");
+    return;
+  }
+
+  const info = await sendEmail({ attachment, filename, reportRange, userName });
+  await recordSendHistory({ ...sendContext, messageId: info.messageId || "" });
 }
 
 async function loadJournalState() {
@@ -58,6 +78,21 @@ async function loadJournalState() {
     return JSON.parse(process.env.WORK_JOURNAL_STATE_JSON);
   }
 
+  const gist = await fetchJournalGist();
+  const file = gist.files?.[GIST_DATA_FILE]
+    || Object.values(gist.files || {}).find((item) => {
+      const filename = item.filename || "";
+      return /\.json$/i.test(filename) && filename !== GIST_HISTORY_FILE;
+    });
+
+  if (!file?.content) {
+    throw new Error(`Gist does not contain ${GIST_DATA_FILE}.`);
+  }
+
+  return JSON.parse(file.content);
+}
+
+async function fetchJournalGist() {
   const gistId = requiredEnv("WORK_JOURNAL_GIST_ID");
   const gistToken = requiredEnv("WORK_JOURNAL_GIST_TOKEN");
   const response = await fetch(`https://api.github.com/gists/${gistId}`, {
@@ -73,15 +108,87 @@ async function loadJournalState() {
     throw new Error(`Failed to read Gist ${gistId}: HTTP ${response.status}`);
   }
 
-  const gist = await response.json();
-  const file = gist.files?.["work-journal.json"]
-    || Object.values(gist.files || {}).find((item) => /\.json$/i.test(item.filename || ""));
+  return response.json();
+}
 
+async function loadSendHistory() {
+  const gist = await fetchJournalGist();
+  const file = gist.files?.[GIST_HISTORY_FILE];
   if (!file?.content) {
-    throw new Error("Gist does not contain work-journal.json.");
+    return { version: 1, entries: [] };
   }
 
-  return JSON.parse(file.content);
+  const parsed = JSON.parse(file.content);
+  return {
+    version: 1,
+    ...parsed,
+    entries: Array.isArray(parsed.entries) ? parsed.entries : [],
+  };
+}
+
+async function shouldSkipForFridayManualSend(context) {
+  if (!isAutomatedTrigger(context.triggerSource)) {
+    return false;
+  }
+
+  const history = await loadSendHistory();
+  return history.entries.some((entry) => {
+    const source = normalizeTriggerSource(entry.trigger_source || entry.source);
+    const sentDate = normalizeDateKey(entry.sent_date || entry.sentDate);
+    return isManualTrigger(source)
+      && isFriday(sentDate)
+      && entry.week_start === context.weekStartKey
+      && entry.week_end === context.weekEndKey;
+  });
+}
+
+async function recordSendHistory(context) {
+  const gistId = requiredEnv("WORK_JOURNAL_GIST_ID");
+  const gistToken = requiredEnv("WORK_JOURNAL_GIST_TOKEN");
+  const history = await loadSendHistory();
+  const sentDate = todayInTimeZone(context.timeZone);
+  const entry = {
+    sent_at: new Date().toISOString(),
+    sent_date: sentDate,
+    sent_weekday: weekdayName(sentDate),
+    trigger_source: context.triggerSource,
+    report_date: context.reportDate,
+    week_start: context.weekStartKey,
+    week_end: context.weekEndKey,
+    filename: context.filename,
+    to: process.env.MAIL_TO || "",
+    cc: process.env.MAIL_CC || "",
+    message_id: context.messageId || "",
+  };
+  const nextHistory = {
+    version: 1,
+    updated_at: entry.sent_at,
+    entries: [entry, ...history.entries].slice(0, 120),
+  };
+
+  const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${gistToken}`,
+      Accept: "application/vnd.github+json",
+      "Content-Type": "application/json",
+      "User-Agent": "work-journal-auto-email",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+    body: JSON.stringify({
+      files: {
+        [GIST_HISTORY_FILE]: {
+          content: JSON.stringify(nextHistory, null, 2),
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update send history: HTTP ${response.status}`);
+  }
+
+  console.log(`Recorded send history: ${entry.trigger_source} ${entry.week_start}..${entry.week_end}`);
 }
 
 async function loadJournalRuntime(state) {
@@ -203,6 +310,7 @@ async function sendEmail({ attachment, filename, reportRange, userName }) {
   });
 
   console.log(`Email sent: ${info.messageId || "ok"}`);
+  return info;
 }
 
 function normalizeState(value) {
@@ -259,4 +367,33 @@ function requiredEnv(name) {
 
 function isTruthy(value) {
   return /^(1|true|yes|y)$/i.test(String(value || "").trim());
+}
+
+function normalizeTriggerSource(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["manual", "page", "web", "workflow_dispatch"].includes(normalized)) return "manual";
+  if (["timer", "external", "cron"].includes(normalized)) return "timer";
+  if (normalized === "schedule") return "schedule";
+  return normalized || "manual";
+}
+
+function isManualTrigger(source) {
+  return normalizeTriggerSource(source) === "manual";
+}
+
+function isAutomatedTrigger(source) {
+  return ["schedule", "timer"].includes(normalizeTriggerSource(source));
+}
+
+function isFriday(dateKey) {
+  return weekdayName(dateKey) === "Friday";
+}
+
+function weekdayName(dateKey) {
+  const normalized = normalizeDateKey(dateKey);
+  if (!normalized) return "";
+  const [year, month, day] = normalized.split("-").map(Number);
+  return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][
+    new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+  ];
 }
