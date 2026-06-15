@@ -2,8 +2,8 @@ name: Auto email weekly report
 
 on:
   schedule:
-    # Temporary delivery test re-armed: wake every 5 minutes and let the script enforce the send window.
-    - cron: "*/5 * * * *"
+    # Saturday morning in Asia/Shanghai. GitHub cron uses UTC; retry a few times around 08:07.
+    - cron: "5,10,15 0 * * 6"
   workflow_dispatch:
     inputs:
       report_date:
@@ -73,10 +73,10 @@ jobs:
           MAIL_SUBJECT: ${{ secrets.MAIL_SUBJECT }}
           MAIL_TEXT: ${{ secrets.MAIL_TEXT }}
           TRIGGER_SOURCE: ${{ github.event.inputs.trigger_source || github.event_name }}
-          SCHEDULE_SEND_WEEKDAY: 1
-          SCHEDULE_SEND_HOUR: 17
-          SCHEDULE_SEND_MINUTE: 40
-          SCHEDULE_SEND_WINDOW_MINUTES: 10
+          SCHEDULE_SEND_WEEKDAY: 6
+          SCHEDULE_SEND_HOUR: 8
+          SCHEDULE_SEND_MINUTE: 7
+          SCHEDULE_SEND_WINDOW_MINUTES: 12
         run: npm run send-weekly-report
 
       - name: Upload generated report
