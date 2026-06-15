@@ -2,8 +2,8 @@ name: Auto email weekly report
 
 on:
   schedule:
-    # Monday 16:13 in Asia/Shanghai for delivery testing. GitHub cron uses UTC.
-    - cron: "13 8 * * 1"
+    # Monday 16:45 in Asia/Shanghai for delivery testing. GitHub cron uses UTC.
+    - cron: "45 8 * * 1"
   workflow_dispatch:
     inputs:
       report_date:
