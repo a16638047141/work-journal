@@ -178,8 +178,6 @@ async function sendEmail({ attachment, filename, reportRange, userName }) {
     "您好，",
     "",
     `附件为${userName}${reportRange}工作周报，请查收。`,
-    "",
-    "此邮件由 GitHub Actions 自动发送。",
   ].join("\n");
 
   const { default: nodemailer } = await import("nodemailer");
