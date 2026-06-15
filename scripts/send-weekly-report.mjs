@@ -30,7 +30,7 @@ async function main() {
   const bounds = runtime.getWorkWeekBounds(runtime.parseDateKey(reportDate));
   const userName = runtime.normalizeUserName(runtime.state.userName);
   const reportRange = `${runtime.formatDateCn(bounds.startKey)} 至 ${runtime.formatDateCn(bounds.endKey)}`;
-  const filename = cleanAttachmentName(`${userName}-${bounds.startKey}至${bounds.endKey}-周报.xlsx`);
+  const filename = cleanAttachmentName(`${bounds.startKey}至${bounds.endKey}-周报.xlsx`);
   const blob = runtime.buildXlsxBlob(reportDate);
   const attachment = Buffer.from(await blob.arrayBuffer());
 
@@ -173,11 +173,11 @@ async function sendEmail({ attachment, filename, reportRange, userName }) {
   const secure = process.env.SMTP_SECURE
     ? isTruthy(process.env.SMTP_SECURE)
     : port === 465;
-  const subject = process.env.MAIL_SUBJECT || `${userName} ${reportRange} 工作周报`;
+  const subject = process.env.MAIL_SUBJECT || `${reportRange} 工作周报`;
   const text = process.env.MAIL_TEXT || [
     "您好，",
     "",
-    `附件为${userName}${reportRange}工作周报，请查收。`,
+    `附件为${reportRange}工作周报，请查收。`,
   ].join("\n");
 
   const { default: nodemailer } = await import("nodemailer");
