@@ -15,6 +15,18 @@ on:
         required: false
         default: false
         type: boolean
+      mail_from:
+        description: "Optional sender display address"
+        required: false
+        type: string
+      mail_to:
+        description: "Optional recipients, separated by commas"
+        required: false
+        type: string
+      mail_cc:
+        description: "Optional CC recipients, separated by commas"
+        required: false
+        type: string
 
 jobs:
   send-weekly-report:
@@ -38,8 +50,8 @@ jobs:
       - name: Generate and send report
         env:
           TIME_ZONE: Asia/Shanghai
-          REPORT_DATE: ${{ inputs.report_date }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          REPORT_DATE: ${{ github.event.inputs.report_date || '' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
           WORK_JOURNAL_GIST_ID: ${{ secrets.WORK_JOURNAL_GIST_ID }}
           WORK_JOURNAL_GIST_TOKEN: ${{ secrets.WORK_JOURNAL_GIST_TOKEN }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
@@ -47,16 +59,16 @@ jobs:
           SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          MAIL_FROM: ${{ secrets.MAIL_FROM }}
-          MAIL_TO: ${{ secrets.MAIL_TO }}
-          MAIL_CC: ${{ secrets.MAIL_CC }}
+          MAIL_FROM: ${{ github.event.inputs.mail_from || secrets.MAIL_FROM }}
+          MAIL_TO: ${{ github.event.inputs.mail_to || secrets.MAIL_TO }}
+          MAIL_CC: ${{ github.event.inputs.mail_cc || secrets.MAIL_CC }}
           MAIL_SUBJECT: ${{ secrets.MAIL_SUBJECT }}
           MAIL_TEXT: ${{ secrets.MAIL_TEXT }}
         run: npm run send-weekly-report
 
       - name: Upload generated report
         uses: actions/upload-artifact@v4
-        if: ${{ always() && inputs.dry_run == true }}
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
         with:
           name: weekly-report
           path: dist/

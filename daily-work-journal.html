@@ -530,7 +530,14 @@
       padding-top: 12px;
     }
 
-    details.template-panel summary {
+    details.email-panel {
+      border-top: 1px solid var(--line);
+      margin-top: 12px;
+      padding-top: 12px;
+    }
+
+    details.template-panel summary,
+    details.email-panel summary {
       cursor: pointer;
       color: var(--muted-strong);
       font-weight: 700;
@@ -828,6 +835,31 @@
           </div>
           <div class="summary-line" id="monthlyReportPreview"></div>
 
+          <details class="email-panel">
+            <summary>邮件发送</summary>
+            <div class="field-grid three">
+              <div class="field">
+                <label for="emailFrom">发件邮箱</label>
+                <input id="emailFrom" type="email" value="yuanhonglin@shuwutech.cn">
+              </div>
+              <div class="field">
+                <label for="emailTo">收件人</label>
+                <input id="emailTo" type="text" placeholder="leader@company.com">
+              </div>
+              <div class="field">
+                <label for="emailCc">抄送</label>
+                <input id="emailCc" type="text" placeholder="可选">
+              </div>
+            </div>
+            <div class="summary-line" id="emailSendPreview"></div>
+            <div class="actions">
+              <button type="button" id="saveEmailSettings">保存发送设置</button>
+              <button type="button" id="manualSendLogin" class="ghost">设置GitHub登录</button>
+              <button type="button" id="sendWeeklyEmail" class="primary">手动发送周报</button>
+              <button type="button" id="openWorkflow" class="ghost">打开Actions</button>
+            </div>
+          </details>
+
           <details class="output-panel" id="outputPanel">
             <summary>可选：查看导出预览</summary>
             <textarea id="reportSource" class="source-hidden" spellcheck="false" readonly aria-hidden="true" tabindex="-1"></textarea>
@@ -848,6 +880,11 @@
   <script>
     (() => {
       const STORE_KEY = "daily-work-journal.v1";
+      const ACTION_TOKEN_KEY = "work-journal.action-token";
+      const DEFAULT_EMAIL_FROM = "yuanhonglin@shuwutech.cn";
+      const GITHUB_REPO = "a16638047141/work-journal";
+      const GITHUB_BRANCH = "main";
+      const WEEKLY_EMAIL_WORKFLOW = "send-weekly-report.yml";
       const TEMPLATE_VERSION = 3;
       const LEGACY_DEFAULT_TEMPLATE = `<section class="weekly-report">
   <h1>数物工作周报</h1>
@@ -1025,6 +1062,14 @@
           "downloadMonthlyReport",
           "printReport",
           "monthlyReportPreview",
+          "emailFrom",
+          "emailTo",
+          "emailCc",
+          "emailSendPreview",
+          "saveEmailSettings",
+          "manualSendLogin",
+          "sendWeeklyEmail",
+          "openWorkflow",
           "reportSource",
           "reportPreview",
           "toast",
@@ -1056,6 +1101,9 @@
         state.generatedReport = state.generatedReport || "";
         state.reportFileName = normalizeReportFileName(state.reportFileName || "周报.xlsx");
         state.userName = normalizeUserName(state.userName);
+        state.emailFrom = normalizeEmailField(state.emailFrom) || DEFAULT_EMAIL_FROM;
+        state.emailTo = normalizeMailList(state.emailTo || "");
+        state.emailCc = normalizeMailList(state.emailCc || "");
         state.template = migrateUserNameTemplate(state.template);
 
         els.journalDate.value = state.selectedDate;
@@ -1064,6 +1112,9 @@
         els.userName.value = state.userName;
         els.reportDate.value = state.reportDate;
         els.reportFileName.value = state.reportFileName;
+        els.emailFrom.value = state.emailFrom;
+        els.emailTo.value = state.emailTo;
+        els.emailCc.value = state.emailCc;
         els.templateText.value = state.template;
         els.reportSource.value = state.generatedReport;
         els.reportPreview.srcdoc = state.generatedReport || emptyPreviewHtml();
@@ -1125,6 +1176,7 @@
           renderExpenses();
           renderReportRange();
           renderMonthlyReportPreview();
+          renderEmailSendPreview();
           queuePersist();
         });
 
@@ -1170,6 +1222,7 @@
           renderExpenses();
           renderReportRange();
           renderMonthlyReportPreview();
+          renderEmailSendPreview();
           queuePersist();
         });
 
@@ -1210,6 +1263,17 @@
         els.downloadReport.addEventListener("click", downloadReport);
         els.downloadMonthlyReport.addEventListener("click", downloadMonthlyReport);
         els.printReport.addEventListener("click", printReport);
+        els.saveEmailSettings.addEventListener("click", saveEmailSettings);
+        els.manualSendLogin.addEventListener("click", configureManualSendLogin);
+        els.sendWeeklyEmail.addEventListener("click", dispatchWeeklyEmail);
+        els.openWorkflow.addEventListener("click", openWeeklyEmailWorkflow);
+        [els.emailFrom, els.emailTo, els.emailCc].forEach((input) => {
+          input.addEventListener("input", () => {
+            updateEmailSettingsFromControls();
+            renderEmailSendPreview();
+            queuePersist();
+          });
+        });
 
         onOptional("cloudNew", "click", cloudEnable);
         onOptional("cloudConnect", "click", cloudConnect);
@@ -1617,6 +1681,7 @@
         renderExpenses();
         renderReportRange();
         renderMonthlyReportPreview();
+        renderEmailSendPreview();
         updateSaveState("已保存到本地");
       }
 
@@ -1769,6 +1834,23 @@
           `<span>${sheetNames}</span>`,
           `<span>本月费用 <strong>${formatMoney(sumExpenses(monthItems))}</strong></span>`
         ].join("");
+      }
+
+      function renderEmailSendPreview() {
+        if (!els.emailSendPreview) return;
+        const dateKey = getActiveReportDateKey();
+        const bounds = getWorkWeekBounds(parseDateKey(dateKey));
+        const from = normalizeEmailField(state.emailFrom) || DEFAULT_EMAIL_FROM;
+        const to = normalizeMailList(state.emailTo || "");
+        const cc = normalizeMailList(state.emailCc || "");
+        const tokenReady = Boolean(getActionToken());
+        els.emailSendPreview.innerHTML = [
+          `<span>发件 <strong>${escapeHtml(from)}</strong></span>`,
+          `<span>收件 <strong>${escapeHtml(to || "未填写")}</strong></span>`,
+          cc ? `<span>抄送 <strong>${escapeHtml(cc)}</strong></span>` : "",
+          `<span>周报 <strong>${escapeHtml(shortDate(bounds.startKey))} 至 ${escapeHtml(shortDate(bounds.endKey))}</strong></span>`,
+          `<span>GitHub登录 <strong>${tokenReady ? "已设置" : "未设置"}</strong></span>`
+        ].filter(Boolean).join("");
       }
 
       function generateAndRenderReport() {
@@ -2733,6 +2815,134 @@ ${workbookRelationships}
         });
       }
 
+      function updateEmailSettingsFromControls() {
+        state.emailFrom = normalizeEmailField(els.emailFrom.value) || DEFAULT_EMAIL_FROM;
+        state.emailTo = normalizeMailList(els.emailTo.value);
+        state.emailCc = normalizeMailList(els.emailCc.value);
+      }
+
+      function saveEmailSettings() {
+        updateEmailSettingsFromControls();
+        els.emailFrom.value = state.emailFrom;
+        els.emailTo.value = state.emailTo;
+        els.emailCc.value = state.emailCc;
+        renderEmailSendPreview();
+        persist("已保存");
+        toast("发送设置已保存");
+      }
+
+      function configureManualSendLogin() {
+        const current = getActionToken();
+        const token = prompt(
+          "输入 GitHub Token（仅用于触发 Actions，不会同步到 Gist）：\n需要有 work-journal 仓库的 Actions 读写权限。",
+          current ? "已设置，留空则不修改" : ""
+        );
+        if (token === null) return;
+        const value = token.trim();
+        if (!value || value === "已设置，留空则不修改") {
+          toast(current ? "GitHub登录保持不变" : "未设置GitHub登录");
+          return;
+        }
+        setActionToken(value);
+        renderEmailSendPreview();
+        toast("GitHub登录已保存到本浏览器");
+      }
+
+      async function dispatchWeeklyEmail() {
+        saveCurrentJournal();
+        updateEmailSettingsFromControls();
+        if (!state.emailTo) {
+          toast("请先填写收件人");
+          els.emailTo.focus();
+          return;
+        }
+
+        const token = await ensureActionToken();
+        if (!token) return;
+
+        const reportDateKey = setReportContextDate(getActiveReportDateKey());
+        persist("已保存");
+        renderEmailSendPreview();
+
+        const oldText = els.sendWeeklyEmail.textContent;
+        els.sendWeeklyEmail.disabled = true;
+        els.sendWeeklyEmail.textContent = "发送中...";
+        try {
+          const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${WEEKLY_EMAIL_WORKFLOW}/dispatches`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/vnd.github+json",
+              "Content-Type": "application/json",
+              "X-GitHub-Api-Version": "2022-11-28"
+            },
+            body: JSON.stringify({
+              ref: GITHUB_BRANCH,
+              inputs: {
+                report_date: reportDateKey,
+                mail_from: state.emailFrom,
+                mail_to: state.emailTo,
+                mail_cc: state.emailCc
+              }
+            })
+          });
+
+          if (response.status === 204) {
+            toast("已触发发送，稍后查看邮箱");
+            return;
+          }
+
+          const detail = await response.text();
+          if (response.status === 401 || response.status === 403) {
+            toast("GitHub登录无效或权限不足");
+          } else if (response.status === 404) {
+            toast("没有找到发送工作流，请确认已更新GitHub");
+          } else {
+            toast(`触发失败：HTTP ${response.status}`);
+          }
+          console.error("workflow_dispatch failed", response.status, detail);
+        } catch (error) {
+          console.error(error);
+          toast("触发发送失败，请检查网络或Token");
+        } finally {
+          els.sendWeeklyEmail.disabled = false;
+          els.sendWeeklyEmail.textContent = oldText;
+        }
+      }
+
+      async function ensureActionToken() {
+        const existing = getActionToken();
+        if (existing) return existing;
+        const token = prompt("输入 GitHub Token 后才能触发发送：");
+        if (!token || !token.trim()) {
+          toast("未设置GitHub登录");
+          return "";
+        }
+        setActionToken(token.trim());
+        renderEmailSendPreview();
+        return token.trim();
+      }
+
+      function getActionToken() {
+        try {
+          return localStorage.getItem(ACTION_TOKEN_KEY) || "";
+        } catch (error) {
+          return "";
+        }
+      }
+
+      function setActionToken(token) {
+        try {
+          localStorage.setItem(ACTION_TOKEN_KEY, token);
+        } catch (error) {
+          toast("无法保存GitHub登录Token");
+        }
+      }
+
+      function openWeeklyEmailWorkflow() {
+        window.open(`https://github.com/${GITHUB_REPO}/actions/workflows/${WEEKLY_EMAIL_WORKFLOW}`, "_blank", "noopener");
+      }
+
       function saveCurrentJournal() {
         const dateKey = normalizeDateKey(els.journalDate.value) || toDateKey(new Date());
         state.selectedDate = dateKey;
@@ -2743,6 +2953,7 @@ ${workbookRelationships}
         const normalized = normalizeDateKey(dateKey) || toDateKey(new Date());
         setReportContextDate(normalized, { expenseView: "week" });
         renderMonthlyReportPreview();
+        renderEmailSendPreview();
       }
 
       function getActiveReportDateKey() {
@@ -3003,7 +3214,10 @@ ${workbookRelationships}
           templateVersion: TEMPLATE_VERSION,
           generatedReport: "",
           reportFileName: "周报.xlsx",
-          userName: "袁宏林"
+          userName: "袁宏林",
+          emailFrom: DEFAULT_EMAIL_FROM,
+          emailTo: "",
+          emailCc: ""
         };
       }
 
@@ -3022,6 +3236,18 @@ ${workbookRelationships}
       function normalizeUserName(name) {
         const value = String(name || "").trim();
         return value || "袁宏林";
+      }
+
+      function normalizeEmailField(value) {
+        return String(value || "").trim();
+      }
+
+      function normalizeMailList(value) {
+        return String(value || "")
+          .split(/[,\n;；，]+/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .join(", ");
       }
 
       function migrateUserNameTemplate(template) {
