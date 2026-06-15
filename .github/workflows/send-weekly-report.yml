@@ -1,0 +1,62 @@
+name: Auto email weekly report
+
+on:
+  schedule:
+    # Friday 18:00 in Asia/Shanghai. GitHub cron uses UTC.
+    - cron: "0 10 * * 5"
+  workflow_dispatch:
+    inputs:
+      report_date:
+        description: "Optional report date, for example 2026-06-19"
+        required: false
+        type: string
+      dry_run:
+        description: "Generate the attachment without sending email"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  send-weekly-report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate and send report
+        env:
+          TIME_ZONE: Asia/Shanghai
+          REPORT_DATE: ${{ inputs.report_date }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          WORK_JOURNAL_GIST_ID: ${{ secrets.WORK_JOURNAL_GIST_ID }}
+          WORK_JOURNAL_GIST_TOKEN: ${{ secrets.WORK_JOURNAL_GIST_TOKEN }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          MAIL_CC: ${{ secrets.MAIL_CC }}
+          MAIL_SUBJECT: ${{ secrets.MAIL_SUBJECT }}
+          MAIL_TEXT: ${{ secrets.MAIL_TEXT }}
+        run: npm run send-weekly-report
+
+      - name: Upload generated report
+        uses: actions/upload-artifact@v4
+        if: ${{ always() && inputs.dry_run == true }}
+        with:
+          name: weekly-report
+          path: dist/

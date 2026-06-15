@@ -1,0 +1,11 @@
+{
+  "name": "work-journal",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "send-weekly-report": "node scripts/send-weekly-report.mjs"
+  },
+  "dependencies": {
+    "nodemailer": "^9.0.0"
+  }
+}
