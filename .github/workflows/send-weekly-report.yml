@@ -2,7 +2,7 @@ name: Auto email weekly report
 
 on:
   schedule:
-    # Saturday morning in Asia/Shanghai. GitHub cron uses UTC; retry a few times around 08:07.
+    # Saturday morning in Asia/Shanghai. GitHub cron uses UTC; retry a few times around 08:07; re-armed via GitHub API.
     - cron: "5,10,15 0 * * 6"
   workflow_dispatch:
     inputs:
