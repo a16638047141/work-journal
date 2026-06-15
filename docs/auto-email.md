@@ -34,16 +34,16 @@
 
 ## 发送时间
 
-默认是每周五 18:00 发送。GitHub Actions 的 cron 使用 UTC，所以配置为：
+默认是每周六 08:07 左右发送。GitHub Actions 的 cron 使用 UTC，避开整点可以减少排队延迟或丢任务的概率，所以配置为：
 
 ```yaml
-cron: "0 10 * * 5"
+cron: "7 0 * * 6"
 ```
 
-如果要改成每周六 10:00，在 `.github/workflows/send-weekly-report.yml` 里改成：
+如果要改成每周六 10:07，在 `.github/workflows/send-weekly-report.yml` 里改成：
 
 ```yaml
-cron: "0 2 * * 6"
+cron: "7 2 * * 6"
 ```
 
 ## 测试方式
