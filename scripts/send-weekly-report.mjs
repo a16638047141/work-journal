@@ -23,6 +23,12 @@ async function main() {
   const reportDate = normalizeDateKey(process.env.REPORT_DATE) || todayInTimeZone(timeZone);
   const dryRun = isTruthy(process.env.DRY_RUN);
   const triggerSource = normalizeTriggerSource(process.env.TRIGGER_SOURCE || process.env.GITHUB_EVENT_NAME);
+  const scheduleDecision = getScheduledSendDecision({ triggerSource, timeZone });
+  if (!scheduleDecision.shouldRun) {
+    console.log(scheduleDecision.reason);
+    return;
+  }
+
   const state = normalizeState(await loadJournalState());
   const runtime = await loadJournalRuntime(state);
 
@@ -45,6 +51,7 @@ async function main() {
     weekEndKey: bounds.endKey,
     userName,
     filename,
+    scheduleKey: scheduleDecision.scheduleKey,
   };
 
   await fs.mkdir(outputDir, { recursive: true });
@@ -66,6 +73,11 @@ async function main() {
 
   if (await shouldSkipForFridayManualSend(sendContext)) {
     console.log("Skipped: this week already has a Friday manual send record.");
+    return;
+  }
+
+  if (await shouldSkipAlreadySent(sendContext)) {
+    console.log("Skipped: this scheduled send was already completed.");
     return;
   }
 
@@ -142,6 +154,19 @@ async function shouldSkipForFridayManualSend(context) {
   });
 }
 
+async function shouldSkipAlreadySent(context) {
+  if (!isAutomatedTrigger(context.triggerSource) || !context.scheduleKey) {
+    return false;
+  }
+
+  const history = await loadSendHistory();
+  return history.entries.some((entry) => {
+    return entry.schedule_key === context.scheduleKey
+      && entry.week_start === context.weekStartKey
+      && entry.week_end === context.weekEndKey;
+  });
+}
+
 async function recordSendHistory(context) {
   const gistId = requiredEnv("WORK_JOURNAL_GIST_ID");
   const gistToken = requiredEnv("WORK_JOURNAL_GIST_TOKEN");
@@ -155,6 +180,7 @@ async function recordSendHistory(context) {
     report_date: context.reportDate,
     week_start: context.weekStartKey,
     week_end: context.weekEndKey,
+    schedule_key: context.scheduleKey || "",
     filename: context.filename,
     to: process.env.MAIL_TO || "",
     cc: process.env.MAIL_CC || "",
@@ -369,6 +395,93 @@ function isTruthy(value) {
   return /^(1|true|yes|y)$/i.test(String(value || "").trim());
 }
 
+function getScheduledSendDecision({ triggerSource, timeZone }) {
+  if (normalizeTriggerSource(triggerSource) !== "schedule") {
+    return { shouldRun: true, scheduleKey: "" };
+  }
+
+  const weekday = normalizeScheduleWeekday(process.env.SCHEDULE_SEND_WEEKDAY || 6);
+  const hour = normalizeNumber(process.env.SCHEDULE_SEND_HOUR, 8);
+  const minute = normalizeNumber(process.env.SCHEDULE_SEND_MINUTE, 7);
+  const windowMinutes = Math.max(1, normalizeNumber(process.env.SCHEDULE_SEND_WINDOW_MINUTES, 10));
+  const now = dateTimeInTimeZone(timeZone);
+  const targetMinuteOfDay = hour * 60 + minute;
+  const currentMinuteOfDay = now.hour * 60 + now.minute;
+  const offset = currentMinuteOfDay - targetMinuteOfDay;
+  const targetLabel = `${now.dateKey} ${pad2(hour)}:${pad2(minute)}`;
+
+  if (now.weekday !== weekday) {
+    return {
+      shouldRun: false,
+      scheduleKey: "",
+      reason: `Skipped: today weekday ${now.weekday} is not scheduled weekday ${weekday}.`,
+    };
+  }
+
+  if (offset < 0 || offset > windowMinutes) {
+    return {
+      shouldRun: false,
+      scheduleKey: "",
+      reason: `Skipped: current time ${now.dateKey} ${pad2(now.hour)}:${pad2(now.minute)} is outside scheduled window ${targetLabel}+${windowMinutes}m.`,
+    };
+  }
+
+  return {
+    shouldRun: true,
+    scheduleKey: `${targetLabel}+${windowMinutes}m`,
+  };
+}
+
+function dateTimeInTimeZone(timeZone) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const dateKey = `${values.year}-${values.month}-${values.day}`;
+  return {
+    dateKey,
+    hour: Number(values.hour),
+    minute: Number(values.minute),
+    weekday: weekdayNumber(dateKey),
+  };
+}
+
+function normalizeScheduleWeekday(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  const names = {
+    sunday: 0,
+    sun: 0,
+    monday: 1,
+    mon: 1,
+    tuesday: 2,
+    tue: 2,
+    wednesday: 3,
+    wed: 3,
+    thursday: 4,
+    thu: 4,
+    friday: 5,
+    fri: 5,
+    saturday: 6,
+    sat: 6,
+  };
+  if (raw in names) return names[raw];
+  const number = Number(raw);
+  if (number === 7) return 0;
+  if (Number.isInteger(number) && number >= 0 && number <= 6) return number;
+  return 6;
+}
+
+function normalizeNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
 function normalizeTriggerSource(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (["manual", "page", "web", "workflow_dispatch"].includes(normalized)) return "manual";
@@ -392,8 +505,18 @@ function isFriday(dateKey) {
 function weekdayName(dateKey) {
   const normalized = normalizeDateKey(dateKey);
   if (!normalized) return "";
-  const [year, month, day] = normalized.split("-").map(Number);
   return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][
-    new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+    weekdayNumber(normalized)
   ];
+}
+
+function weekdayNumber(dateKey) {
+  const normalized = normalizeDateKey(dateKey);
+  if (!normalized) return NaN;
+  const [year, month, day] = normalized.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
 }
