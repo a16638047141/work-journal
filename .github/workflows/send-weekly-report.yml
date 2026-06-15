@@ -2,7 +2,7 @@ name: Auto email weekly report
 
 on:
   schedule:
-    # Temporary delivery test: wake every 5 minutes and let the script enforce the send window.
+    # Temporary delivery test re-armed: wake every 5 minutes and let the script enforce the send window.
     - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
