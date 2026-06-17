@@ -42,6 +42,8 @@ cron: "5,10,15 0 * * 6"
 
 自动发送前会检查 Gist 里的发送历史。如果本周已经在周五通过网页按钮手动发送过，周六的自动发送会直接跳过，避免重复发同一份周报。
 
+如果改用外部定时器触发 `workflow_dispatch`，输入里带上 `trigger_source=timer`。脚本会按周记录 `timer` 发送历史，同一周外部定时器重复触发时会自动跳过。
+
 如果要改成每周六 10:07，在 `.github/workflows/send-weekly-report.yml` 里改成：
 
 ```yaml

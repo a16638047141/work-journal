@@ -396,7 +396,12 @@ function isTruthy(value) {
 }
 
 function getScheduledSendDecision({ triggerSource, timeZone }) {
-  if (normalizeTriggerSource(triggerSource) !== "schedule") {
+  const normalizedSource = normalizeTriggerSource(triggerSource);
+  if (normalizedSource === "timer") {
+    return { shouldRun: true, scheduleKey: "timer" };
+  }
+
+  if (normalizedSource !== "schedule") {
     return { shouldRun: true, scheduleKey: "" };
   }
 
