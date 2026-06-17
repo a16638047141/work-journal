@@ -44,6 +44,8 @@ cron: "5,10,15 0 * * 6"
 
 如果改用外部定时器触发 `workflow_dispatch`，输入里带上 `trigger_source=timer`。脚本会按周记录 `timer` 发送历史，同一周外部定时器重复触发时会自动跳过。
 
+仓库里已经提供 Cloudflare Workers 定时器模板：`cloudflare-email-timer/`。它不使用 GitHub 自带 `schedule`，而是由 Cloudflare cron 在云端触发 GitHub 的手动发送接口。测试配置是周三 16:20 中国时间，正式配置是周六 08:07 中国时间。
+
 如果要改成每周六 10:07，在 `.github/workflows/send-weekly-report.yml` 里改成：
 
 ```yaml

@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "work-journal-email-timer",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-17",
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    // Test schedule: Wednesday 16:20 in Asia/Shanghai. Cloudflare cron uses UTC.
+    "crons": ["20 8 * * 3"]
+  },
+  "vars": {
+    "GITHUB_REPO": "a16638047141/work-journal",
+    "GITHUB_WORKFLOW": "send-weekly-report.yml",
+    "GITHUB_REF": "main",
+    "TRIGGER_SOURCE": "timer"
+  },
+  "env": {
+    "prod": {
+      "triggers": {
+        // Production schedule: Saturday 08:07 in Asia/Shanghai. Cloudflare cron uses UTC.
+        "crons": ["7 0 * * 6"]
+      },
+      "vars": {
+        "GITHUB_REPO": "a16638047141/work-journal",
+        "GITHUB_WORKFLOW": "send-weekly-report.yml",
+        "GITHUB_REF": "main",
+        "TRIGGER_SOURCE": "timer"
+      }
+    }
+  }
+}
