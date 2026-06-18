@@ -3,12 +3,13 @@
   "name": "work-journal-email-timer",
   "main": "src/index.js",
   "compatibility_date": "2026-06-17",
+  "workers_dev": false,
   "observability": {
     "enabled": true
   },
   "triggers": {
-    // Test schedule: Wednesday 16:20 in Asia/Shanghai. Cloudflare cron uses UTC.
-    "crons": ["20 8 * * 3"]
+    // Keep the default environment unscheduled; production owns the weekly trigger.
+    "crons": []
   },
   "vars": {
     "GITHUB_REPO": "a16638047141/work-journal",
@@ -18,9 +19,10 @@
   },
   "env": {
     "prod": {
+      "workers_dev": false,
       "triggers": {
-        // Production schedule: Saturday 08:07 in Asia/Shanghai. Cloudflare cron uses UTC.
-        "crons": ["7 0 * * 6"]
+        // Production schedule: Saturday 08:00 in Asia/Shanghai. Cloudflare cron uses UTC.
+        "crons": ["0 0 * * 6"]
       },
       "vars": {
         "GITHUB_REPO": "a16638047141/work-journal",

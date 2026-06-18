@@ -34,22 +34,22 @@
 
 ## 发送时间
 
-默认是每周六 08:07 左右发送。GitHub Actions 的 cron 使用 UTC，当前配置会在周六 08:05、08:10、08:15 左右尝试唤醒，由脚本判断是否在发送窗口内，并用发送历史避免重复发送：
+正式发送由 Cloudflare Worker 在云端触发，不依赖电脑开机。当前时间是每周六北京时间 08:00；Cloudflare cron 使用 UTC：
 
-```yaml
-cron: "5,10,15 0 * * 6"
+```jsonc
+"crons": ["0 0 * * 6"]
 ```
 
 自动发送前会检查 Gist 里的发送历史。如果本周已经在周五通过网页按钮手动发送过，周六的自动发送会直接跳过，避免重复发同一份周报。
 
-如果改用外部定时器触发 `workflow_dispatch`，输入里带上 `trigger_source=timer`。脚本会按周记录 `timer` 发送历史，同一周外部定时器重复触发时会自动跳过。
+Cloudflare 触发 GitHub Actions 的 `workflow_dispatch`，并传入 `trigger_source=timer`。脚本会按周记录 `timer` 发送历史，同一周重复触发时会自动跳过。
 
-仓库里已经提供 Cloudflare Workers 定时器模板：`cloudflare-email-timer/`。它不使用 GitHub 自带 `schedule`，而是由 Cloudflare cron 在云端触发 GitHub 的手动发送接口。测试配置是周三 16:20 中国时间，正式配置是周六 08:07 中国时间。
+定时器配置位于 `cloudflare-email-timer/`。默认测试环境不设 Cron，正式环境使用 `env.prod`；GitHub 工作流本身只保留手动接口，不再使用 GitHub 原生 `schedule`。
 
-如果要改成每周六 10:07，在 `.github/workflows/send-weekly-report.yml` 里改成：
+如果要改成每周六 10:00，在 `cloudflare-email-timer/wrangler.jsonc` 的 `env.prod.triggers` 中改成：
 
-```yaml
-cron: "7 2 * * 6"
+```jsonc
+"crons": ["0 2 * * 6"]
 ```
 
 ## 测试方式

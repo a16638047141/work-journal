@@ -19,23 +19,21 @@ npx wrangler secret put GITHUB_ACTIONS_TOKEN
 
 ## 测试定时
 
-默认配置是周三 16:20 中国时间：
+默认环境不设置定时任务，避免测试任务重复运行：
 
 ```jsonc
-"crons": ["20 8 * * 3"]
+"crons": []
 ```
 
-部署测试版：
+需要测试时可临时填写一个 UTC cron，然后部署默认环境。测试成功后应恢复为空数组：
 
 ```powershell
-npm run deploy
+npx wrangler deploy --env=""
 ```
-
-Cloudflare cron 使用 UTC，不是北京时间。`20 8 * * 3` 等于中国时间周三 16:20。
 
 ## 正式定时
 
-正式环境配置在 `env.prod`，时间是每周六 08:07 中国时间：
+正式环境配置在 `env.prod`，时间是每周六 08:00 中国时间。Cloudflare cron 使用 UTC，`0 0 * * 6` 等于北京时间周六 08:00：
 
 ```powershell
 npm run deploy:prod
@@ -43,7 +41,7 @@ npm run deploy:prod
 
 ## 手动云端触发测试
 
-部署后也可以临时调用：
+当前配置关闭了 `workers.dev` 公网地址。如需临时调用 `/trigger`，先为 Worker 配置公开路由，再发送请求：
 
 ```powershell
 Invoke-WebRequest -Method Post https://<worker-url>/trigger
