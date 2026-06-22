@@ -33,7 +33,13 @@ npx wrangler deploy --env=""
 
 ## 正式定时
 
-正式环境配置在 `env.prod`，时间是每周六 08:00 中国时间。Cloudflare cron 使用 UTC，`0 0 * * 6` 等于北京时间周六 08:00：
+正式环境配置在 `env.prod`，会在每周六 08:00、08:05、08:10 中国时间依次尝试。Cloudflare cron 使用 UTC：
+
+```jsonc
+"crons": ["0,5,10 0 * * 6"]
+```
+
+首次发送成功后，后续运行会由 Gist 发送历史自动跳过。单次调用遇到 HTTP 408、425、429 或 5xx 时，Worker 还会在内部重试最多三次。
 
 ```powershell
 npm run deploy:prod
@@ -44,7 +50,7 @@ npm run deploy:prod
 当前配置关闭了 `workers.dev` 公网地址。如需临时调用 `/trigger`，先为 Worker 配置公开路由，再发送请求：
 
 ```powershell
-Invoke-WebRequest -Method Post https://<worker-url>/trigger
+Invoke-WebRequest -Method Post "https://<worker-url>/trigger?dry_run=true"
 ```
 
 如果设置了 `TIMER_SHARED_SECRET`，调用时需要带：

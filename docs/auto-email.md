@@ -34,13 +34,13 @@
 
 ## 发送时间
 
-正式发送由 Cloudflare Worker 在云端触发，不依赖电脑开机。当前时间是每周六北京时间 08:00；Cloudflare cron 使用 UTC：
+正式发送由 Cloudflare Worker 在云端触发，不依赖电脑开机。当前会在每周六北京时间 08:00、08:05、08:10 依次尝试；Cloudflare cron 使用 UTC：
 
 ```jsonc
-"crons": ["0 0 * * 6"]
+"crons": ["0,5,10 0 * * 6"]
 ```
 
-自动发送前会检查 Gist 里的发送历史。如果本周已经在周五通过网页按钮手动发送过，周六的自动发送会直接跳过，避免重复发同一份周报。
+自动发送前会检查 Gist 里的发送历史。首次发送成功后，后续两个时间点会自动跳过；如果本周已经在周五通过网页按钮手动发送过，周六的自动发送也会直接跳过，避免重复发同一份周报。Worker 调用 GitHub 遇到临时 HTTP 错误时会在内部重试最多三次，最终失败会明确记录为错误。
 
 Cloudflare 触发 GitHub Actions 的 `workflow_dispatch`，并传入 `trigger_source=timer`。脚本会按周记录 `timer` 发送历史，同一周重复触发时会自动跳过。
 
@@ -49,7 +49,7 @@ Cloudflare 触发 GitHub Actions 的 `workflow_dispatch`，并传入 `trigger_so
 如果要改成每周六 10:00，在 `cloudflare-email-timer/wrangler.jsonc` 的 `env.prod.triggers` 中改成：
 
 ```jsonc
-"crons": ["0 2 * * 6"]
+"crons": ["0,5,10 2 * * 6"]
 ```
 
 ## 测试方式

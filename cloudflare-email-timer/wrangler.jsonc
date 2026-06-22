@@ -20,9 +20,14 @@
   "env": {
     "prod": {
       "workers_dev": false,
+      "preview_urls": false,
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+      },
       "triggers": {
-        // Production schedule: Saturday 08:00 in Asia/Shanghai. Cloudflare cron uses UTC.
-        "crons": ["0 0 * * 6"]
+        // Saturday 08:00, 08:05, and 08:10 in Asia/Shanghai. Cloudflare cron uses UTC.
+        "crons": ["0,5,10 0 * * 6"]
       },
       "vars": {
         "GITHUB_REPO": "a16638047141/work-journal",
