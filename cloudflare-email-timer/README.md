@@ -33,10 +33,10 @@ npx wrangler deploy --env=""
 
 ## 正式定时
 
-正式环境配置在 `env.prod`，会在每周六 08:00、08:05、08:10 中国时间依次尝试。Cloudflare cron 使用 UTC：
+正式环境配置在 `env.prod`，会在每周六 08:00、08:05、08:10 中国时间依次尝试。Cloudflare cron 使用 UTC，星期字段用 `SAT`，避免 Cloudflare 的数字星期规则造成误解：
 
 ```jsonc
-"crons": ["0,5,10 0 * * 6"]
+"crons": ["0,5,10 0 * * SAT"]
 ```
 
 首次发送成功后，后续运行会由 Gist 发送历史自动跳过。单次调用遇到 HTTP 408、425、429 或 5xx 时，Worker 还会在内部重试最多三次。

@@ -27,7 +27,8 @@
       },
       "triggers": {
         // Saturday 08:00, 08:05, and 08:10 in Asia/Shanghai. Cloudflare cron uses UTC.
-        "crons": ["0,5,10 0 * * 6"]
+        // Use SAT instead of a numeric weekday because Cloudflare maps 1=SUN ... 7=SAT.
+        "crons": ["0,5,10 0 * * SAT"]
       },
       "vars": {
         "GITHUB_REPO": "a16638047141/work-journal",
