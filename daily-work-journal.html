@@ -995,6 +995,7 @@
       const els = {};
       let persistTimer = 0;
       let toastTimer = 0;
+      let loadedJournalDate = "";
       let pendingTripRows = [];
       let pdfJsLoadPromise = null;
       const PDFJS_URL = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
@@ -1106,8 +1107,9 @@
         state.emailCc = normalizeMailList(state.emailCc || "");
         state.template = migrateUserNameTemplate(state.template);
 
-        els.journalDate.value = state.selectedDate;
-        els.journalText.value = state.journals[state.selectedDate] || "";
+        loadedJournalDate = state.selectedDate;
+        els.journalDate.value = loadedJournalDate;
+        els.journalText.value = state.journals[loadedJournalDate] || "";
         els.expenseDate.value = state.reportDate;
         els.userName.value = state.userName;
         els.reportDate.value = state.reportDate;
@@ -1123,15 +1125,7 @@
 
       function bindEvents() {
         els.journalDate.addEventListener("change", () => {
-          saveCurrentJournal();
-          state.selectedDate = normalizeDateKey(els.journalDate.value) || toDateKey(new Date());
-          els.journalDate.value = state.selectedDate;
-          syncWeekContext(state.selectedDate);
-          els.journalText.value = state.journals[state.selectedDate] || "";
-          renderJournal();
-          renderExpenses();
-          renderReportRange();
-          queuePersist();
+          switchJournalDate(els.journalDate.value);
         });
 
         els.journalText.addEventListener("input", () => {
@@ -1149,7 +1143,8 @@
 
         els.clearJournal.addEventListener("click", () => {
           if (!els.journalText.value.trim() || confirm("清空当前日期的日报？")) {
-            delete state.journals[els.journalDate.value];
+            const dateKey = getLoadedJournalDate();
+            delete state.journals[dateKey];
             els.journalText.value = "";
             renderAll();
             persist("已保存");
@@ -1705,7 +1700,7 @@
       }
 
       function renderJournal() {
-        const dateKey = els.journalDate.value || state.selectedDate;
+        const dateKey = getLoadedJournalDate();
         const text = els.journalText.value || "";
         const words = countChineseAware(text);
         els.journalWordCount.textContent = `${words} 字`;
@@ -1715,7 +1710,7 @@
       }
 
       function renderWeekStrip() {
-        const active = els.journalDate.value || state.selectedDate;
+        const active = getLoadedJournalDate();
         const days = getWorkdays(active);
         els.weekStrip.innerHTML = days.map((dateKey) => {
           const date = parseDateKey(dateKey);
@@ -1731,15 +1726,7 @@
 
         els.weekStrip.querySelectorAll("[data-journal-day]").forEach((button) => {
           button.addEventListener("click", () => {
-            saveCurrentJournal();
-            state.selectedDate = button.dataset.journalDay;
-            els.journalDate.value = state.selectedDate;
-            syncWeekContext(state.selectedDate);
-            els.journalText.value = state.journals[state.selectedDate] || "";
-            renderJournal();
-            renderExpenses();
-            renderReportRange();
-            queuePersist();
+            switchJournalDate(button.dataset.journalDay);
           });
         });
       }
@@ -2945,9 +2932,44 @@ ${workbookRelationships}
       }
 
       function saveCurrentJournal() {
-        const dateKey = normalizeDateKey(els.journalDate.value) || toDateKey(new Date());
+        const dateKey = getLoadedJournalDate();
         state.selectedDate = dateKey;
-        setJournalEntry(dateKey, els.journalText.value);
+        saveJournalForDate(dateKey, els.journalText.value);
+      }
+
+      function saveJournalForDate(dateKey, text) {
+        const normalized = normalizeDateKey(dateKey) || toDateKey(new Date());
+        setJournalEntry(normalized, text);
+        return normalized;
+      }
+
+      function switchJournalDate(dateKey) {
+        const previousDate = getLoadedJournalDate();
+        saveJournalForDate(previousDate, els.journalText.value);
+        clearTimeout(persistTimer);
+        loadJournalDate(dateKey);
+        renderJournal();
+        renderExpenses();
+        renderReportRange();
+        persistStateOnly("已保存");
+      }
+
+      function loadJournalDate(dateKey) {
+        const normalized = normalizeDateKey(dateKey) || toDateKey(new Date());
+        loadedJournalDate = normalized;
+        state.selectedDate = normalized;
+        els.journalDate.value = normalized;
+        els.journalText.value = state.journals[normalized] || "";
+        syncWeekContext(normalized);
+        return normalized;
+      }
+
+      function getLoadedJournalDate() {
+        loadedJournalDate = normalizeDateKey(loadedJournalDate)
+          || normalizeDateKey(state.selectedDate)
+          || normalizeDateKey(els.journalDate && els.journalDate.value)
+          || toDateKey(new Date());
+        return loadedJournalDate;
       }
 
       function syncWeekContext(dateKey) {
@@ -3006,6 +3028,10 @@ ${workbookRelationships}
 
       function persist(message) {
         saveCurrentJournal();
+        persistStateOnly(message);
+      }
+
+      function persistStateOnly(message) {
         if (saveToStorage()) {
           updateSaveState(message || "已保存");
         }
